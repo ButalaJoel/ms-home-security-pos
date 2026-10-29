@@ -1,0 +1,21 @@
+
+@import "tailwindcss";
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: #dbe5f2;
+  text-decoration: none;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.sidebar-link:hover,
+.sidebar-link.active {
+  background-color: #103149;
+  color: #08b9f0;
+}
