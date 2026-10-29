@@ -37,6 +37,7 @@ import authRoutes, { configureAuthDatabase } from "./authRoutes.js";
 
 import userRoutes, { configureUserRoutesDatabase } from "./userRoutes.js";
 const app = express();
+app.set('trust proxy', 1);
 const port = Number(process.env.PORT) || 5000;
 
 // ---------------------------------------------------------
