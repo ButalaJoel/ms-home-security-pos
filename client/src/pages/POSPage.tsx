@@ -455,6 +455,13 @@ const grandTotal = taxableAmount + tax;
       return;
     }
 
+    const unpriced = cart.find((item) => item.type === "product" && item.price <= 0);
+    if (unpriced && unpriced.type === "product") {
+      setMessage(`${unpriced.product.name} has no price yet. Type the agreed price on its cart line.`);
+      setMessageIsError(true);
+      return;
+    }
+
     const belowCost = cart.find(
       (item) => item.type === "product" && !!item.product.costPrice && item.price < (item.product.costPrice ?? 0),
     );

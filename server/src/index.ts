@@ -1907,6 +1907,10 @@ if (customerId) {
         if (item.unitPrice !== undefined && unitPrice < costPrice) {
           throw new Error(`BELOW_COST:${product.name}:${costPrice}`);
         }
+        // Products imported without a price must be priced before they are sold.
+        if (unitPrice <= 0) {
+          throw new Error(`NO_PRICE:${product.name}`);
+        }
         if (!Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > Number.MAX_SAFE_INTEGER) {
           throw new Error(`INVALID_PRICE:${product.name}`);
         }
@@ -2079,6 +2083,10 @@ customerType,
     if (message.startsWith("INSUFFICIENT_STOCK:")) {
       const details = message.split(":");
       res.status(409).json({ success: false, message: `Insufficient stock for ${details[1]}. Available quantity: ${details[2] ?? "0"}. Refresh the catalogue and adjust the cart.` });
+      return;
+    }
+    if (message.startsWith("NO_PRICE:")) {
+      res.status(400).json({ success: false, message: `${message.slice(9)} has no price yet. Enter the agreed price on the cart line, or set it in Products.` });
       return;
     }
     if (message.startsWith("BELOW_COST:")) {
