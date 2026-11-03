@@ -50,6 +50,10 @@ import {
 
 } from "lucide-react";
 import { API_BASE, apiFetch } from "../lib/api";
+import { useNavigate } from "react-router-dom";
+import { Send } from "lucide-react";
+import ShareDialog from "../components/ShareDialog";
+import { invoiceNumber, saleDocumentHtml, type SaleForDocument } from "../lib/documents";
 
 
 
@@ -183,7 +187,7 @@ const defaultTerms = `1. This quotation is valid for the period stated above.
 
 2. Work or supply begins after written acceptance and receipt of the agreed deposit.
 
-3. Suggested payment schedule: 50% deposit, 30% upon delivery or commencement of installation, and 20% after completion and handover, unless otherwise agreed in writing.
+3. Jobs that involve installation require a 70% deposit, with the 30% balance paid on handover, unless otherwise agreed in writing.
 
 4. Any additional equipment, materials, cabling, civil works or labour outside this quotation will be discussed and approved by the customer before extra charges are incurred.
 
@@ -203,7 +207,11 @@ export default function DocumentsPage() {
 
   const [activeTab, setActiveTab] =
 
-    useState<DocumentTab>("quotations");
+    useState<DocumentTab>("invoices");
+
+  // Quotations now live on their own page (saved, numbered, convertible).
+  const navigate = useNavigate();
+  const [sendingDocument, setSendingDocument] = useState<PrintableDocument | null>(null);
 
 
 
@@ -711,7 +719,7 @@ ${isReceipt ? (paid > 0 ? " This receipt records the payment shown above against
 
   // Document settings.
 
-  const quotePrefix = settingText("quotePrefix", "QUO");
+
 
 
 
@@ -1018,69 +1026,7 @@ const configuredTaxRate = (() => {
    */
 
   function startNewQuote() {
-
-    setQuoteNumber(makeQuoteNumber(quotePrefix));
-
-    setShowPreview(false);
-
-    setCreatingQuote(true);
-
-    setActiveTab("quotations");
-
-    setTaxEnabled(false);
-
-
-
-    setCustomer("");
-
-    setCustomerPhone("");
-
-    setCustomerAddress("");
-
-    setNotes("");
-
-    setDiscount("0");
-
-    setProductSearch("");
-
-
-
-    setValidDays(
-
-      settingText("quotationValidityDays", "30"),
-
-    );
-
-
-
-    setTerms(
-
-      settingText("termsAndConditions", defaultTerms),
-
-    );
-
-
-
-    setItems([
-
-      {
-
-        id: 1,
-
-        description: "",
-
-        quantity: 1,
-
-        unitPrice: 0,
-
-      },
-
-    ]);
-
-
-
-    setNextItemId(2);
-
+    navigate("/quotations?new=1");
   }
 
 
@@ -1498,7 +1444,7 @@ const configuredTaxRate = (() => {
               type="button"
 
               onClick={() => {
-
+                if (tab.id === "quotations") { navigate("/quotations"); return; }
                 setActiveTab(tab.id);
 
                 setCreatingQuote(false);
@@ -2410,7 +2356,7 @@ const configuredTaxRate = (() => {
           <div className="mx-auto my-4 max-w-3xl rounded-2xl bg-white shadow-2xl">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4">
               <div><h3 className="font-bold text-slate-900">{selectedDocument.kind === "invoice" ? "Invoice preview" : "Receipt preview"}</h3><p className="text-xs text-slate-500">Generated from saved POS sale {saleReference(selectedDocument.sale)}.</p></div>
-              <div className="flex flex-wrap gap-2"><button type="button" onClick={() => printSavedDocument(selectedDocument)} className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"><Printer size={16} /> Print / Save PDF</button><button type="button" onClick={() => setSelectedDocument(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">Close</button></div>
+              <div className="flex flex-wrap gap-2"><button type="button" onClick={() => printSavedDocument(selectedDocument)} className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"><Printer size={16} /> Print / Save PDF</button><button type="button" onClick={() => setSendingDocument(selectedDocument)} className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"><Send size={16} /> Send</button><button type="button" onClick={() => setSelectedDocument(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">Close</button></div>
             </div>
             <div className="p-5 sm:p-7">
               <div className="flex flex-col justify-between gap-4 border-b-2 border-sky-500 pb-5 sm:flex-row">
@@ -3021,6 +2967,28 @@ const configuredTaxRate = (() => {
 
 
 
+      {sendingDocument && (() => {
+        const doc = sendingDocument;
+        const sale = doc.sale as SaleForDocument;
+        const isInvoice = doc.kind === "invoice";
+        const number = isInvoice ? invoiceNumber(sale, businessSettings) : saleReference(doc.sale);
+        const business = settingText("businessName", "MS Home Security Solutions");
+        return (
+          <ShareDialog
+            title={`${doc.kind} ${number}`}
+            html={saleDocumentHtml(sale, doc.kind, businessSettings)}
+            fileName={`${number}.pdf`}
+            message={
+              isInvoice
+                ? `Hello ${saleCustomerName(doc.sale)},\n\nPlease find attached invoice ${number} from ${business}. Total ${formatUGX(saleTotal(doc.sale))}, balance due ${formatUGX(saleBalance(doc.sale))}.\n\nThank you.`
+                : `Hello ${saleCustomerName(doc.sale)},\n\nThank you for your payment. Please find attached receipt ${number} from ${business}.`
+            }
+            emailSubject={`${isInvoice ? "Invoice" : "Receipt"} ${number} — ${business}`}
+            phone={doc.sale.customerPhone}
+            onClose={() => setSendingDocument(null)}
+          />
+        );
+      })()}
     </div>
 
   );

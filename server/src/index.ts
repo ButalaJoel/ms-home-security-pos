@@ -36,6 +36,15 @@ import helmet from "helmet";
 import authRoutes, { configureAuthDatabase } from "./authRoutes.js";
 
 import userRoutes, { configureUserRoutesDatabase } from "./userRoutes.js";
+import activityRoutes, { activityLogger } from "./features/activity.js";
+import quotationRoutes from "./features/quotations.js";
+import paymentRoutes from "./features/payments.js";
+import jobRoutes from "./features/jobs.js";
+import serialRoutes from "./features/serials.js";
+import supplierRoutes from "./features/suppliers.js";
+import expenseRoutes from "./features/expenses.js";
+import productPhotoRoutes from "./features/productPhotos.js";
+import productImportRoutes from "./features/productImport.js";
 const app = express();
 app.set('trust proxy', 1);
 const port = Number(process.env.PORT) || 5000;
@@ -118,6 +127,9 @@ app.use(
 // Parse JSON request bodies. The size limit helps prevent oversized payloads.
 app.use(express.json({ limit: "1mb" }));
 
+// Record every successful change (who, what, when) in the activity log.
+app.use(activityLogger);
+
 // Configure Cloudinary for company-logo uploads.
 // Keep credentials in server/.env; never expose them in the frontend.
 cloudinary.config({
@@ -187,17 +199,42 @@ const adjustmentTypes: AdjustmentType[] = [
   "Stock correction",
 ];
 
+// Every field the Settings page can save. Fields not listed here are ignored,
+// so this list must match the Settings page.
 const defaultSettings = {
   businessName: "MS Home Security",
   businessEmail: "",
   businessPhone: "",
   businessAddress: "",
+  phone: "",
+  phone2: "",
+  phone3: "",
+  email: "",
+  address: "",
   currency: "UGX",
+  country: "Uganda",
+  timezone: "Africa/Kampala",
+  dateFormat: "DD/MM/YYYY",
+  invoicePrefix: "INV",
+  receiptPrefix: "REC",
+  quotePrefix: "QUO",
+  quotationValidityDays: "30",
+  paymentTerms: "",
   lowStockThreshold: "5",
   defaultUnit: "Pieces",
   taxEnabled: false,
   taxLabel: "Tax",
   taxRate: "0",
+  bankName: "",
+  bankAccountName: "",
+  bankAccountNumber: "",
+  bankBranch: "",
+  mtnRegisteredName: "",
+  mtnPaymentNumber: "",
+  airtelRegisteredName: "",
+  airtelPaymentNumber: "",
+  warrantyDuration: "6 months",
+  termsAndConditions: "",
   logoUrl: "",
 };
 
@@ -1437,6 +1474,10 @@ type SaleLine = {
   category?: string;
   brand?: string;
   unitPrice: number;
+  // Cost price at the time of sale, for profit reports (product lines only).
+  unitCost?: number;
+  // Catalogue price at the time of sale (differs from unitPrice when bargained).
+  listPrice?: number;
   quantity: number;
   discountPercent: number;
   discountAmount: number;
@@ -1709,7 +1750,7 @@ const paymentMethod = cleanString(req.body?.paymentMethod);
     }
 
     // Validate each line and aggregate registered products for atomic stock checks.
-    const combined = new Map<string, { quantity: number; discount: number }>();
+    const combined = new Map<string, { quantity: number; discount: number; unitPrice?: number }>();
     const customItemTypes = ["Service", "Labour", "Material", "Other"] as const;
     for (const item of items) {
       if (!item || !Number.isSafeInteger(item.quantity) || item.quantity <= 0) {
@@ -1746,12 +1787,21 @@ const paymentMethod = cleanString(req.body?.paymentMethod);
         res.status(400).json({ success: false, message: "Select a valid sale line type." });
         return;
       }
+      // Optional agreed (bargained) price for a product line.
+      if (item.unitPrice !== undefined && (!isNonNegativeNumber(item.unitPrice) || item.unitPrice > Number.MAX_SAFE_INTEGER)) {
+        res.status(400).json({ success: false, message: "Product prices must be non-negative numbers." });
+        return;
+      }
       if (typeof item.productId !== "string" || !getProductId(item.productId)) {
         res.status(400).json({ success: false, message: "A sale contains an invalid product ID." });
         return;
       }
 
       const previous = combined.get(item.productId);
+      if (previous && previous.unitPrice !== item.unitPrice) {
+        res.status(400).json({ success: false, message: "The same product cannot have different prices on separate lines." });
+        return;
+      }
       if (previous && previous.discount !== discount) {
         res.status(400).json({ success: false, message: "The same product cannot have different discounts on separate lines." });
         return;
@@ -1764,6 +1814,7 @@ const paymentMethod = cleanString(req.body?.paymentMethod);
       combined.set(item.productId, {
         quantity: combinedQuantity,
         discount,
+        unitPrice: item.unitPrice,
       });
     }
 
@@ -1848,7 +1899,14 @@ if (customerId) {
         }
 
         const product = productsById.get(item.productId!)!;
-        const unitPrice = Number(product.sellingPrice);
+        const listPrice = Number(product.sellingPrice);
+        const costPrice = Number(product.costPrice || 0);
+        // The cashier may agree a different price (bargain or premium),
+        // but never below the product's cost price.
+        const unitPrice = item.unitPrice !== undefined ? item.unitPrice : listPrice;
+        if (item.unitPrice !== undefined && unitPrice < costPrice) {
+          throw new Error(`BELOW_COST:${product.name}:${costPrice}`);
+        }
         if (!Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > Number.MAX_SAFE_INTEGER) {
           throw new Error(`INVALID_PRICE:${product.name}`);
         }
@@ -1865,6 +1923,8 @@ if (customerId) {
           category: String(product.category ?? ""),
           brand: String(product.brand ?? ""),
           unitPrice,
+          unitCost: Number.isFinite(costPrice) ? costPrice : 0,
+          listPrice,
           quantity: item.quantity,
           discountPercent,
           discountAmount,
@@ -2021,6 +2081,11 @@ customerType,
       res.status(409).json({ success: false, message: `Insufficient stock for ${details[1]}. Available quantity: ${details[2] ?? "0"}. Refresh the catalogue and adjust the cart.` });
       return;
     }
+    if (message.startsWith("BELOW_COST:")) {
+      const details = message.split(":");
+      res.status(400).json({ success: false, message: `${details[1]} cannot be sold below its cost price (UGX ${Number(details[2] || 0).toLocaleString("en-UG")}).` });
+      return;
+    }
     if (message.startsWith("INVALID_PRICE:")) {
       res.status(400).json({ success: false, message: "A product has an invalid selling price. Correct the product before selling it." });
       return;
@@ -2032,6 +2097,20 @@ customerType,
     await session.endSession();
   }
 });
+
+// ---------------------------------------------------------
+// 7b. FEATURE ROUTES
+// ---------------------------------------------------------
+
+app.use(productImportRoutes); // POST /api/products/import
+app.use(productPhotoRoutes); // /api/products/:id/photo
+app.use(paymentRoutes); // /api/sales/:id/payments, /api/balances
+app.use("/api/quotations", quotationRoutes);
+app.use("/api/jobs", jobRoutes);
+app.use("/api/serials", serialRoutes);
+app.use("/api/activity", activityRoutes);
+app.use("/api", supplierRoutes); // /api/suppliers, /api/stock-receipts
+app.use("/api", expenseRoutes); // /api/expenses, /api/cashups, /api/reports/profit
 
 // ---------------------------------------------------------
 // 8. ERROR HANDLING
@@ -2088,6 +2167,17 @@ async function startServer() {
   try {
     const db = await connectToDatabase();
     await db.collection("sales").createIndex({ clientSaleId: 1 }, { unique: true, sparse: true });
+    await Promise.all([
+      db.collection("quotations").createIndex({ number: 1 }, { unique: true }),
+      db.collection("quotations").createIndex({ createdAt: -1 }),
+      db.collection("jobs").createIndex({ number: 1 }, { unique: true }),
+      db.collection("serials").createIndex({ serialNumber: 1 }, { unique: true }),
+      db.collection("stock_receipts").createIndex({ number: 1 }, { unique: true }),
+      db.collection("expenses").createIndex({ date: -1 }),
+      db.collection("cashups").createIndex({ date: 1 }, { unique: true }),
+      db.collection("activity_log").createIndex({ createdAt: -1 }),
+      db.collection("sales").createIndex({ "payments.receivedAt": 1 }),
+    ]);
 
     configureAuthDatabase(db);
   configureUserRoutesDatabase(db);

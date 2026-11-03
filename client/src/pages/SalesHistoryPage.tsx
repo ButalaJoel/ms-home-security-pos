@@ -10,6 +10,13 @@ import {
   X,
 } from "lucide-react";
 import { API_BASE, apiFetch } from "../lib/api";
+import { FileText, Receipt, Send, Wallet } from "lucide-react";
+import RecordPaymentDialog from "../components/RecordPaymentDialog";
+import ShareDialog from "../components/ShareDialog";
+import { Notice } from "../components/ui";
+import { saleDocumentHtml, invoiceNumber, settingText, type SaleForDocument } from "../lib/documents";
+import { printHtml } from "../lib/share";
+import { useSettings } from "../lib/useSettings";
 
 // Sales are loaded from the backend, not from hardcoded demo records.
 type SaleItem = {
@@ -43,6 +50,10 @@ type Sale = {
   change?: number;
   paymentStatus?: "paid" | "partial" | "unpaid" | string;
   createdAt: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  customerAddress?: string;
+  payments?: { id: string; receiptNumber: string; amount: number; method: string; note?: string; receivedAt: string; recordedByName?: string }[];
 };
 
 const API_BASE_URL = (
@@ -89,6 +100,10 @@ export default function SalesHistoryPage() {
   const [paymentMethod, setPaymentMethod] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [payingSale, setPayingSale] = useState<Sale | null>(null);
+  const [sendingDoc, setSendingDoc] = useState<{ sale: Sale; kind: "invoice" | "receipt" } | null>(null);
+  const [notice, setNotice] = useState("");
+  const settings = useSettings();
 
   const pageSize = 8;
 
@@ -143,6 +158,10 @@ export default function SalesHistoryPage() {
           change: Number(raw.change ?? 0),
           paymentStatus: String(raw.paymentStatus ?? ""),
           createdAt: String(raw.createdAt ?? ""),
+          customerPhone: raw.customerPhone ? String(raw.customerPhone) : "",
+          customerEmail: raw.customerEmail ? String(raw.customerEmail) : "",
+          customerAddress: raw.customerAddress ? String(raw.customerAddress) : "",
+          payments: Array.isArray(raw.payments) ? (raw.payments as Sale["payments"]) : [],
         };
       });
 
@@ -250,6 +269,8 @@ export default function SalesHistoryPage() {
           </button>
         </div>
       </div>
+
+      {notice && <Notice tone="success" onClose={() => setNotice("")}>{notice}</Notice>}
 
       {/* Totals are calculated from the records currently matching the filters. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -494,12 +515,85 @@ export default function SalesHistoryPage() {
               <div className="flex justify-between gap-4"><span className="text-slate-500">Balance</span><span className="font-semibold">{formatUGX(selectedSale.balance)}</span></div>
             </div>
 
-            <div className="mt-6 flex justify-end">
+            {(selectedSale.payments?.length ?? 0) > 0 && (
+              <div className="mt-5">
+                <h3 className="text-sm font-semibold text-slate-900">Payments received after the sale</h3>
+                <ul className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200 text-sm">
+                  {selectedSale.payments!.map((payment) => (
+                    <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                      <span>
+                        <span className="font-medium">{payment.receiptNumber}</span>
+                        <span className="ml-2 text-xs text-slate-500">{formatDate(payment.receivedAt)} · {payment.method}{payment.recordedByName ? ` · by ${payment.recordedByName}` : ""}</span>
+                        {payment.note && <span className="block text-xs text-slate-500">{payment.note}</span>}
+                      </span>
+                      <span className="font-semibold text-emerald-700">{formatUGX(payment.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              {selectedSale.balance > 0 && (
+                <button type="button" onClick={() => setPayingSale(selectedSale)} className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-600">
+                  <Wallet size={16} /> Record payment
+                </button>
+              )}
+              <button type="button" onClick={() => printHtml(saleDocumentHtml(selectedSale as SaleForDocument, "invoice", settings))} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <FileText size={16} /> Invoice
+              </button>
+              {selectedSale.amountPaid > 0 && (
+                <button type="button" onClick={() => printHtml(saleDocumentHtml(selectedSale as SaleForDocument, "receipt", settings))} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                  <Receipt size={16} /> Receipt
+                </button>
+              )}
+              <button type="button" onClick={() => setSendingDoc({ sale: selectedSale, kind: selectedSale.balance > 0 ? "invoice" : "receipt" })} className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
+                <Send size={16} /> Send {selectedSale.balance > 0 ? "invoice" : "receipt"}
+              </button>
               <button type="button" onClick={() => setSelectedSale(null)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Close</button>
             </div>
           </div>
         </div>
       )}
+
+      {payingSale && (
+        <RecordPaymentDialog
+          saleId={payingSale.id}
+          reference={payingSale.receiptNumber}
+          customer={payingSale.customer || "Walk-in customer"}
+          balance={payingSale.balance}
+          onClose={() => setPayingSale(null)}
+          onRecorded={(message) => {
+            setPayingSale(null);
+            setSelectedSale(null);
+            setNotice(message);
+            void loadSales(true);
+          }}
+        />
+      )}
+
+      {sendingDoc && (() => {
+        const doc = sendingDoc;
+        const isInvoice = doc.kind === "invoice";
+        const number = isInvoice ? invoiceNumber(doc.sale as SaleForDocument, settings) : doc.sale.receiptNumber;
+        const business = settingText(settings, "businessName", "MS Home Security Solutions");
+        return (
+          <ShareDialog
+            title={`${doc.kind} ${number}`}
+            html={saleDocumentHtml(doc.sale as SaleForDocument, doc.kind, settings)}
+            fileName={`${number}.pdf`}
+            message={
+              isInvoice
+                ? `Hello ${doc.sale.customer || ""},\n\nPlease find attached invoice ${number} from ${business}. Total ${formatUGX(doc.sale.grandTotal)}, balance due ${formatUGX(doc.sale.balance)}.\n\nThank you.`
+                : `Hello ${doc.sale.customer || ""},\n\nThank you for your payment. Please find attached receipt ${number} from ${business}.`
+            }
+            emailSubject={`${isInvoice ? "Invoice" : "Receipt"} ${number} — ${business}`}
+            phone={doc.sale.customerPhone}
+            email={doc.sale.customerEmail}
+            onClose={() => setSendingDoc(null)}
+          />
+        );
+      })()}
     </section>
   );
 }

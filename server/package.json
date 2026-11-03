@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "seed:products": "tsx src/seedDemoProducts.ts"
+    "seed:products": "tsx src/seedDemoProducts.ts",
+    "reset:test-data": "tsx src/resetTestData.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

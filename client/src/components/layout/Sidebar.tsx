@@ -142,16 +142,22 @@ export default function Sidebar({
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
 
+            const section = "section" in item ? item.section : undefined;
             return (
+              <div key={item.path}>
+              {section && (
+                <p className={`px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-widest text-slate-500 first:pt-0 ${collapsed ? "md:hidden" : ""}`}>
+                  {section}
+                </p>
+              )}
               <button
-                key={item.path}
                 type="button"
                 title={collapsed ? item.label : undefined}
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => handleNavigation(item.path)}
                 className={`
                   group relative flex w-full items-center gap-3
-                  rounded-xl px-3 py-3 text-left text-sm
+                  rounded-xl px-3 py-2.5 text-left text-sm
                   transition-all duration-200
                   focus-visible:outline-none focus-visible:ring-2
                   focus-visible:ring-sky-400
@@ -177,6 +183,7 @@ export default function Sidebar({
                   {item.label}
                 </span>
               </button>
+              </div>
             );
           })}
         </nav>

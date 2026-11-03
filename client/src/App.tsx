@@ -23,6 +23,13 @@ import CustomersPage from "./pages/CustomersPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
+import QuotationsPage from "./pages/QuotationsPage";
+import BalancesPage from "./pages/BalancesPage";
+import JobsPage from "./pages/JobsPage";
+import WarrantiesPage from "./pages/WarrantiesPage";
+import SuppliersPage from "./pages/SuppliersPage";
+import ExpensesPage from "./pages/ExpensesPage";
+import ActivityPage from "./pages/ActivityPage";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { syncPendingSales } from "./db/syncService";
@@ -172,6 +179,13 @@ function AppLayout() {
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/quotations" element={<QuotationsPage />} />
+            <Route path="/balances" element={<BalancesPage />} />
+            <Route path="/jobs" element={<JobsPage />} />
+            <Route path="/warranties" element={<WarrantiesPage />} />
+            <Route path="/suppliers" element={<SuppliersPage />} />
+            <Route path="/expenses" element={<ExpensesPage />} />
+            <Route path="/activity" element={<ActivityPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

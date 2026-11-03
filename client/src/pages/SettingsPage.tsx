@@ -66,7 +66,7 @@ const initialSettings = {
   warrantyDuration: "6 months",
   termsAndConditions:
     "1. Product purchases require full payment unless otherwise agreed.\n" +
-    "2. Installation projects follow a 50% deposit, 30% progress payment and 20% on completion.\n" +
+    "2. Jobs that involve installation require a 70% deposit, with the 30% balance paid on handover.\n" +
     "3. Goods sold are not returnable, subject to applicable law and warranty obligations.\n" +
     "4. Products carry a 6-month warranty, subject to applicable terms and exclusions.\n" +
     "5. Quotations are valid for 30 days unless otherwise stated.",

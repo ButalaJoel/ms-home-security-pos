@@ -24,8 +24,10 @@ type Product = {
   brand: string;
   category: string;
   sellingPrice: number;
+  costPrice?: number;
   quantity: number;
   active?: boolean;
+  imageUrl?: string;
 };
 
 type ProductCartItem = {
@@ -33,6 +35,9 @@ type ProductCartItem = {
   product: Product;
   quantity: number;
   discount: number;
+  // Agreed price for this sale. Starts at the catalogue price; can be
+  // bargained down (not below cost) or charged higher.
+  price: number;
 };
 
 type CustomCartItem = {
@@ -46,6 +51,10 @@ type CustomCartItem = {
 };
 
 type CartItem = ProductCartItem | CustomCartItem;
+
+function linePrice(item: CartItem): number {
+  return item.type === "product" ? item.price : item.unitPrice;
+}
 
 type SavedSaleItem = {
   type?: "product" | "custom";
@@ -164,8 +173,10 @@ const taxRate = taxEnabled ? businessSettings.taxRate : 0;
           brand: String(item.brand ?? ""),
           category: String(item.category ?? "Other"),
           sellingPrice: Number(item.sellingPrice ?? 0),
+          costPrice: Number(item.costPrice ?? 0),
           quantity: Number(item.quantity ?? item.stockQuantity ?? 0),
           active: item.active !== false,
+          imageUrl: typeof item.imageUrl === "string" ? item.imageUrl : "",
         }),
       );
 
@@ -293,7 +304,7 @@ const taxRate = taxEnabled ? businessSettings.taxRate : 0;
   }, [products, search, category]);
 
   const subtotal = cart.reduce(
-    (sum, item) => sum + (item.type === "product" ? item.product.sellingPrice : item.unitPrice) * item.quantity,
+    (sum, item) => sum + linePrice(item) * item.quantity,
     0,
   );
 
@@ -301,7 +312,7 @@ const taxRate = taxEnabled ? businessSettings.taxRate : 0;
     (sum, item) =>
       sum +
       Math.round(
-        (item.type === "product" ? item.product.sellingPrice : item.unitPrice) * item.quantity * (item.discount / 100),
+        linePrice(item) * item.quantity * (item.discount / 100),
       ),
     0,
   );
@@ -361,7 +372,7 @@ const grandTotal = taxableAmount + tax;
         );
       }
 
-      return [...current, { type: "product", product, quantity: 1, discount: 0 }];
+      return [...current, { type: "product", product, quantity: 1, discount: 0, price: product.sellingPrice }];
     });
   }
 
@@ -400,6 +411,15 @@ const grandTotal = taxableAmount + tax;
     );
   }
 
+  function updateLinePrice(productId: string, value: string) {
+    const price = Math.max(0, Math.round(Number(value) || 0));
+    setCart((current) =>
+      current.map((item) =>
+        item.type === "product" && getProductId(item.product) === productId ? { ...item, price } : item,
+      ),
+    );
+  }
+
   function updateLineDiscount(productId: string, value: string) {
     const percentage = Math.min(100, Math.max(0, Number(value) || 0));
 
@@ -431,6 +451,15 @@ const grandTotal = taxableAmount + tax;
 
     if (cart.length === 0) {
       setMessage("Add at least one product before completing a sale.");
+      setMessageIsError(true);
+      return;
+    }
+
+    const belowCost = cart.find(
+      (item) => item.type === "product" && !!item.product.costPrice && item.price < (item.product.costPrice ?? 0),
+    );
+    if (belowCost && belowCost.type === "product") {
+      setMessage(`${belowCost.product.name} cannot be sold below its cost price. Raise the price.`);
       setMessageIsError(true);
       return;
     }
@@ -477,7 +506,7 @@ const grandTotal = taxableAmount + tax;
       overallDiscount: discount,
       taxEnabled,
       items: cart.map((item) => item.type === "product"
-        ? { type: "product", productId: getProductId(item.product), quantity: item.quantity, discount: item.discount }
+        ? { type: "product", productId: getProductId(item.product), quantity: item.quantity, discount: item.discount, unitPrice: item.price }
         : { type: "custom", name: item.name, customType: item.itemType, quantity: item.quantity, unitPrice: item.unitPrice, discount: item.discount }),
     };
 
@@ -521,11 +550,11 @@ const grandTotal = taxableAmount + tax;
               productName: item.type === "product" ? item.product.name : item.name,
               name: item.type === "custom" ? item.name : item.product.name,
               quantity: item.quantity,
-              unitPrice: item.type === "product" ? item.product.sellingPrice : item.unitPrice,
+              unitPrice: linePrice(item),
               discountPercent: item.discount,
-              discountAmount: Math.round((item.type === "product" ? item.product.sellingPrice : item.unitPrice) * item.quantity * item.discount / 100),
+              discountAmount: Math.round(linePrice(item) * item.quantity * item.discount / 100),
               lineTotal: Math.round(
-                (item.type === "product" ? item.product.sellingPrice : item.unitPrice) *
+                linePrice(item) *
                   item.quantity *
                   (1 - item.discount / 100)
               ),
@@ -665,12 +694,16 @@ const grandTotal = taxableAmount + tax;
                     key={product.id}
                     className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-sky-200 hover:shadow-sm"
                   >
-                    <div className="flex h-24 items-center justify-center bg-slate-100 sm:h-28">
-                      <Package
-                        size={30}
-                        strokeWidth={1.7}
-                        className="text-slate-400"
-                      />
+                    <div className="flex h-24 items-center justify-center overflow-hidden bg-slate-100 sm:h-28">
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      ) : (
+                        <Package
+                          size={30}
+                          strokeWidth={1.7}
+                          className="text-slate-400"
+                        />
+                      )}
                     </div>
 
                     <div className="flex flex-1 flex-col p-3">
@@ -859,9 +892,32 @@ const grandTotal = taxableAmount + tax;
                         <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.type === "custom" ? "bg-violet-50 text-violet-700" : "bg-slate-100 text-slate-600"}`}>
                           {item.type === "product" ? "Inventory product" : `${item.itemType} · Custom`}
                         </span>
-                        <p className="mt-1 text-[11px] text-slate-500">
-                          {money(item.type === "product" ? item.product.sellingPrice : item.unitPrice)} each
-                        </p>
+                        {item.type === "product" ? (
+                          <div className="mt-1 text-[11px] text-slate-500">
+                            <label className="flex flex-wrap items-center gap-1.5">
+                              Price each
+                              <input
+                                type="number"
+                                min={item.product.costPrice || 0}
+                                step={1000}
+                                value={item.price}
+                                onChange={(event) => updateLinePrice(getProductId(item.product), event.target.value)}
+                                aria-label={`Agreed price for ${item.product.name}`}
+                                className={`w-28 rounded border px-1.5 py-1 text-xs text-slate-800 ${item.product.costPrice && item.price < item.product.costPrice ? "border-red-400 bg-red-50" : "border-slate-200"}`}
+                              />
+                            </label>
+                            {item.price !== item.product.sellingPrice && (
+                              <span className="block">List price {money(item.product.sellingPrice)}</span>
+                            )}
+                            {!!item.product.costPrice && item.price < item.product.costPrice && (
+                              <span className="block font-semibold text-red-600">Below cost ({money(item.product.costPrice)}) — not allowed</span>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            {money(linePrice(item))} each
+                          </p>
+                        )}
                       </div>
 
                       <button
@@ -927,7 +983,7 @@ const grandTotal = taxableAmount + tax;
 
                       <strong className="ml-auto text-sm">
                         {money(
-                          (item.type === "product" ? item.product.sellingPrice : item.unitPrice) *
+                          linePrice(item) *
                             item.quantity *
                             (1 - item.discount / 100),
                         )}

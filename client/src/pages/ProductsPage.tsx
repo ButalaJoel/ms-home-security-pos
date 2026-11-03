@@ -10,8 +10,11 @@ import {
   Pencil,
   X,
   RefreshCw,
+  ImagePlus,
+  Upload,
 } from "lucide-react";
 import { API_BASE, apiFetch } from "../lib/api";
+import ProductImportDialog from "../components/ProductImportDialog";
 
 // Keep the API URL configurable for development and deployment.
 const API_URL = (
@@ -29,6 +32,7 @@ type Product = {
   stock: number;
   reorderLevel: number;
   active: boolean;
+  imageUrl: string;
 };
 
 type ProductForm = {
@@ -77,6 +81,11 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [formError, setFormError] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const photoPreview = useMemo(() => (photoFile ? URL.createObjectURL(photoFile) : ""), [photoFile]);
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
 
   // Fetch the catalogue from MongoDB through the Express API.
   const loadProducts = useCallback(async () => {
@@ -104,6 +113,7 @@ export default function ProductsPage() {
           stock: Number(item.quantity ?? item.stock ?? 0),
           reorderLevel: Number(item.reorderLevel ?? 5),
           active: item.active !== false,
+          imageUrl: typeof item.imageUrl === "string" ? item.imageUrl : "",
         })
       );
 
@@ -175,6 +185,8 @@ export default function ProductsPage() {
   }
 
   function openAddModal() {
+    setPhotoFile(null);
+    setRemovePhoto(false);
     setEditingProduct(null);
     setForm(emptyForm);
     setFormError("");
@@ -183,6 +195,8 @@ export default function ProductsPage() {
   }
 
   function openEditModal(product: Product) {
+    setPhotoFile(null);
+    setRemovePhoto(false);
     setEditingProduct(product);
     setForm({
       name: product.name,
@@ -264,6 +278,20 @@ export default function ProductsPage() {
         throw new Error(data.message || "Could not save product.");
       }
 
+      // Optional photo: upload or remove after the product details are saved.
+      const savedId = String(data.product?.id ?? data.product?._id ?? editingProduct?.id ?? "");
+      if (savedId && photoFile) {
+        const photoData = new FormData();
+        photoData.append("photo", photoFile);
+        const photoResponse = await apiFetch(`/api/products/${savedId}/photo`, { method: "POST", body: photoData });
+        const photoResult = await photoResponse.json().catch(() => ({}));
+        if (!photoResponse.ok) {
+          throw new Error(`Product saved, but the photo failed: ${photoResult.message || "upload error"}.`);
+        }
+      } else if (savedId && removePhoto && editingProduct?.imageUrl) {
+        await apiFetch(`/api/products/${savedId}/photo`, { method: "DELETE" });
+      }
+
       setModalOpen(false);
       setNotice(
         editingProduct
@@ -301,6 +329,15 @@ export default function ProductsPage() {
           >
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
             Refresh
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            <Upload size={16} />
+            Import
           </button>
 
           <button
@@ -446,9 +483,13 @@ export default function ProductsPage() {
                   <tr key={product.id} className="transition hover:bg-sky-50/50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-                          <Package size={19} strokeWidth={1.7} />
-                        </div>
+                        {product.imageUrl ? (
+                          <img src={product.imageUrl} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                        ) : (
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                            <Package size={19} strokeWidth={1.7} />
+                          </div>
+                        )}
                         <div>
                           <p className="text-xs font-semibold text-slate-900">
                             {product.name}
@@ -592,6 +633,45 @@ export default function ProductsPage() {
 
             <form onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 sm:p-6">
+                <div className="flex items-center gap-4 sm:col-span-2">
+                  {photoFile ? (
+                    <img src={photoPreview} alt="New product photo" className="h-20 w-20 rounded-xl object-cover" />
+                  ) : editingProduct?.imageUrl && !removePhoto ? (
+                    <img src={editingProduct.imageUrl} alt={editingProduct.name} className="h-20 w-20 rounded-xl object-cover" />
+                  ) : (
+                    <div className="flex h-20 w-20 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-400">
+                      <ImagePlus size={24} />
+                    </div>
+                  )}
+                  <div className="text-sm">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">
+                      <ImagePlus size={16} />
+                      {editingProduct?.imageUrl || photoFile ? "Change photo" : "Add photo"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(event) => {
+                          setPhotoFile(event.target.files?.[0] ?? null);
+                          setRemovePhoto(false);
+                        }}
+                      />
+                    </label>
+                    {(photoFile || (editingProduct?.imageUrl && !removePhoto)) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhotoFile(null);
+                          setRemovePhoto(true);
+                        }}
+                        className="ml-2 text-xs font-semibold text-red-600 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    )}
+                    <p className="mt-1 text-xs text-slate-500">Optional. Helps staff find items faster on the till. Max 5 MB.</p>
+                  </div>
+                </div>
                 <label className="text-sm font-medium text-slate-700 sm:col-span-2">
                   Product name *
                   <input
@@ -731,6 +811,16 @@ export default function ProductsPage() {
             </form>
           </section>
         </div>
+      )}
+      {importOpen && (
+        <ProductImportDialog
+          onClose={() => setImportOpen(false)}
+          onImported={(message) => {
+            setImportOpen(false);
+            setNotice(message);
+            void loadProducts();
+          }}
+        />
       )}
     </div>
   );
