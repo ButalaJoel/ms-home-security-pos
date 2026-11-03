@@ -18,6 +18,9 @@
  */
 
 import "dotenv/config";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, {
   type Request,
   type Response,
@@ -58,6 +61,10 @@ const port = Number(process.env.PORT) || 5000;
 
 const allowedOrigins = [
   process.env.CLIENT_URL,
+  // The app's own address on Render (set automatically by Render), used now
+  // that the server also serves the app itself.
+  process.env.RENDER_EXTERNAL_URL,
+  process.env.APP_URL,
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:5175",
@@ -93,7 +100,30 @@ app.use(
   }),
 );
 
-app.use(helmet());
+// Security headers. The content policy allows what the app really uses:
+// its own files, product photos and the logo from Cloudinary, generated PDFs
+// (blob:), and the installable-app service worker.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com"],
+        fontSrc: ["'self'", "data:"],
+        connectSrc: ["'self'", "https://res.cloudinary.com"],
+        frameSrc: ["'self'", "blob:", "data:"],
+        workerSrc: ["'self'", "blob:"],
+        manifestSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+      },
+    },
+  }),
+);
 
 const sessionSecret = process.env.SESSION_SECRET;
 
@@ -2119,6 +2149,41 @@ app.use("/api/serials", serialRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api", supplierRoutes); // /api/suppliers, /api/stock-receipts
 app.use("/api", expenseRoutes); // /api/expenses, /api/cashups, /api/reports/profit
+
+// ---------------------------------------------------------
+// 7c. THE APP ITSELF (built React files)
+// ---------------------------------------------------------
+// The server also serves the built app from client/dist, so the whole system
+// runs as one Render service with one link. Any address that is not /api/...
+// returns the app, which then shows the right page.
+const clientDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/dist");
+
+if (existsSync(path.join(clientDist, "index.html"))) {
+  app.use(
+    express.static(clientDist, {
+      index: false,
+      setHeaders(res, filePath) {
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          // Hashed build files never change.
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      },
+    }),
+  );
+  app.get(/^\/(?!api\/).*/, (_req: Request, res: Response) => {
+    res.setHeader("Cache-Control", "no-cache");
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
+} else {
+  console.log("client/dist not found: serving the API only.");
+}
+
+// Unknown API addresses get a JSON 404 instead of the app.
+app.use("/api", (_req: Request, res: Response) => {
+  res.status(404).json({ success: false, message: "API endpoint not found." });
+});
 
 // ---------------------------------------------------------
 // 8. ERROR HANDLING

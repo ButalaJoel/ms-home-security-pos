@@ -1,0 +1,12 @@
+{
+  "name": "ms-home-security-pos",
+  "private": true,
+  "description": "MS Home Security POS: React app (client) served by the Express API (server) as one Render service.",
+  "scripts": {
+    "build": "npm --prefix client ci --include=dev && npm --prefix client run build && npm --prefix server ci --include=dev && npm --prefix server run build",
+    "start": "npm --prefix server start"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
