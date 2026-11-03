@@ -27,6 +27,29 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+// The last signed-in user is remembered on this device so the till still
+// opens when there is no internet (offline sales). The server keeps checking
+// the real session for everything it saves.
+const CACHED_USER_KEY = "ms-pos-signed-in-user";
+
+function readCachedUser(): AuthUser | null {
+  try {
+    const raw = localStorage.getItem(CACHED_USER_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedUser(user: AuthUser | null) {
+  try {
+    if (user) localStorage.setItem(CACHED_USER_KEY, JSON.stringify(user));
+    else localStorage.removeItem(CACHED_USER_KEY);
+  } catch {
+    // Storage unavailable: offline opening just won't be possible.
+  }
+}
+
 interface ApiResponse {
   success: boolean;
   message?: string;
@@ -38,18 +61,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
+    let response: Response;
     try {
-      const response = await apiFetch("/api/auth/me");
+      response = await apiFetch("/api/auth/me");
+    } catch {
+      // No connection: keep working as the last signed-in user (offline mode).
+      setUser(readCachedUser());
+      setLoading(false);
+      return;
+    }
+
+    try {
       const data = (await response.json()) as ApiResponse;
 
       if (!response.ok || !data.success || !data.user) {
+        // A server error while it starts up is not a sign-out.
+        if (response.status >= 500 && readCachedUser()) {
+          setUser(readCachedUser());
+          return;
+        }
+        writeCachedUser(null);
         setUser(null);
         return;
       }
 
+      writeCachedUser(data.user);
       setUser(data.user);
     } catch {
-      setUser(null);
+      setUser(readCachedUser());
     } finally {
       setLoading(false);
     }
@@ -75,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(data.message || "Unable to log in.");
       }
 
+      writeCachedUser(data.user);
       setUser(data.user);
     },
     [],
@@ -92,6 +132,7 @@ const logout = useCallback(async () => {
     throw new Error(data.message || "Unable to log out. Please try again.");
   }
 
+  writeCachedUser(null);
   setUser(null);
 }, []);
 
