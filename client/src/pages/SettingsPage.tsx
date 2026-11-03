@@ -19,7 +19,7 @@ import {
   CreditCard,
   ShieldCheck,
 } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { API_BASE, apiFetch } from "../lib/api";
 import UsersPage from "./UsersPage";
 import { useAuth } from "../context/AuthContext";
 
@@ -92,7 +92,7 @@ const sections: {
 ];
 
 const API_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000"
+  API_BASE
 ).replace(/\/$/, "");
 
 const inputClass =

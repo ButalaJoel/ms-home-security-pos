@@ -1,6 +1,6 @@
 import { recordLocalSaleWithPayload } from "../db/offlineService";
 import type { LocalSale } from "../db/database";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   Check,
@@ -13,7 +13,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { API_BASE, apiFetch } from "../lib/api";
 import { cacheProducts, getCachedProducts } from "../db/offlineService";
 
 // Product records are loaded from MongoDB through the backend API.
@@ -28,15 +28,30 @@ type Product = {
   active?: boolean;
 };
 
-type CartItem = {
+type ProductCartItem = {
+  type: "product";
   product: Product;
   quantity: number;
   discount: number;
 };
 
-type SavedSaleItem = {
+type CustomCartItem = {
+  type: "custom";
+  id: string;
   name: string;
-  sku: string;
+  itemType: "Service" | "Labour" | "Material" | "Other";
+  unitPrice: number;
+  quantity: number;
+  discount: number;
+};
+
+type CartItem = ProductCartItem | CustomCartItem;
+
+type SavedSaleItem = {
+  type?: "product" | "custom";
+  customType?: "Service" | "Labour" | "Material" | "Other";
+  name: string;
+  sku?: string;
   unitPrice: number;
   quantity: number;
   discountPercent: number;
@@ -77,7 +92,7 @@ type BusinessSettings = {
 };
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000"
+  API_BASE
 ).replace(/\/+$/, "");
 
 const money = (amount: number) =>
@@ -94,6 +109,13 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All products");
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [showCustomItemForm, setShowCustomItemForm] = useState(false);
+  const [customItemName, setCustomItemName] = useState("");
+  const [customItemType, setCustomItemType] = useState<CustomCartItem["itemType"]>("Other");
+  const [customItemQuantity, setCustomItemQuantity] = useState("1");
+  const [customItemPrice, setCustomItemPrice] = useState("");
+  const [customItemDiscount, setCustomItemDiscount] = useState("0");
+  const [customItemError, setCustomItemError] = useState("");
 
   // Customer information is captured here and sent with the saved sale.
   const [customerName, setCustomerName] = useState("");
@@ -271,7 +293,7 @@ const taxRate = taxEnabled ? businessSettings.taxRate : 0;
   }, [products, search, category]);
 
   const subtotal = cart.reduce(
-    (sum, item) => sum + item.product.sellingPrice * item.quantity,
+    (sum, item) => sum + (item.type === "product" ? item.product.sellingPrice : item.unitPrice) * item.quantity,
     0,
   );
 
@@ -279,7 +301,7 @@ const taxRate = taxEnabled ? businessSettings.taxRate : 0;
     (sum, item) =>
       sum +
       Math.round(
-        item.product.sellingPrice * item.quantity * (item.discount / 100),
+        (item.type === "product" ? item.product.sellingPrice : item.unitPrice) * item.quantity * (item.discount / 100),
       ),
     0,
   );
@@ -317,7 +339,7 @@ const grandTotal = taxableAmount + tax;
     }
 
     const existing = cart.find(
-      (item) => getProductId(item.product) === getProductId(product),
+      (item) => item.type === "product" && getProductId(item.product) === getProductId(product),
     );
 
     if ((existing?.quantity ?? 0) >= product.quantity) {
@@ -328,32 +350,49 @@ const grandTotal = taxableAmount + tax;
 
     setCart((current) => {
       const found = current.find(
-        (item) => getProductId(item.product) === getProductId(product),
+        (item) => item.type === "product" && getProductId(item.product) === getProductId(product),
       );
 
       if (found) {
         return current.map((item) =>
-          getProductId(item.product) === getProductId(product)
+          item.type === "product" && getProductId(item.product) === getProductId(product)
             ? { ...item, quantity: item.quantity + 1 }
             : item,
         );
       }
 
-      return [...current, { product, quantity: 1, discount: 0 }];
+      return [...current, { type: "product", product, quantity: 1, discount: 0 }];
     });
+  }
+
+  function addCustomItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = customItemName.trim();
+    const quantity = Number(customItemQuantity);
+    const unitPrice = Number(customItemPrice);
+    const discount = Number(customItemDiscount);
+    if (!name) return setCustomItemError("Enter an item description.");
+    if (!Number.isSafeInteger(quantity) || quantity <= 0) return setCustomItemError("Quantity must be a positive whole number.");
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) return setCustomItemError("Unit price must be zero or more.");
+    if (!Number.isFinite(discount) || discount < 0 || discount > 100) return setCustomItemError("Discount must be between 0% and 100%.");
+    setCart((current) => [...current, { type: "custom", id: crypto.randomUUID(), name, itemType: customItemType, quantity, unitPrice, discount }]);
+    setCustomItemName("");
+    setCustomItemType("Other");
+    setCustomItemQuantity("1");
+    setCustomItemPrice("");
+    setCustomItemDiscount("0");
+    setCustomItemError("");
+    setShowCustomItemForm(false);
   }
 
   function updateQuantity(productId: string, amount: number) {
     setCart((current) =>
       current
         .map((item) =>
-          getProductId(item.product) === productId
+          (item.type === "product" ? getProductId(item.product) : item.id) === productId
             ? {
                 ...item,
-                quantity: Math.min(
-                  item.product.quantity,
-                  item.quantity + amount,
-                ),
+                quantity: Math.max(0, item.type === "product" ? Math.min(item.product.quantity, item.quantity + amount) : item.quantity + amount),
               }
             : item,
         )
@@ -366,7 +405,7 @@ const grandTotal = taxableAmount + tax;
 
     setCart((current) =>
       current.map((item) =>
-        getProductId(item.product) === productId
+        (item.type === "product" ? getProductId(item.product) : item.id) === productId
           ? { ...item, discount: percentage }
           : item,
       ),
@@ -437,11 +476,9 @@ const grandTotal = taxableAmount + tax;
       amountPaid: paidInput,
       overallDiscount: discount,
       taxEnabled,
-      items: cart.map((item) => ({
-        productId: getProductId(item.product),
-        quantity: item.quantity,
-        discount: item.discount,
-      })),
+      items: cart.map((item) => item.type === "product"
+        ? { type: "product", productId: getProductId(item.product), quantity: item.quantity, discount: item.discount }
+        : { type: "custom", name: item.name, customType: item.itemType, quantity: item.quantity, unitPrice: item.unitPrice, discount: item.discount }),
     };
 
     let serverResponded = false;
@@ -480,17 +517,20 @@ const grandTotal = taxableAmount + tax;
             id: clientSaleId,
             receiptNumber: `PENDING-${clientSaleId.slice(0, 8)}`,
             items: cart.map((item) => ({
-              productId: getProductId(item.product),
-              productName: item.product.name,
+              ...(item.type === "product" ? { type: "product" as const, productId: getProductId(item.product) } : { type: "custom" as const, customType: item.itemType }),
+              productName: item.type === "product" ? item.product.name : item.name,
+              name: item.type === "custom" ? item.name : item.product.name,
               quantity: item.quantity,
-              unitPrice: item.product.sellingPrice,
+              unitPrice: item.type === "product" ? item.product.sellingPrice : item.unitPrice,
+              discountPercent: item.discount,
+              discountAmount: Math.round((item.type === "product" ? item.product.sellingPrice : item.unitPrice) * item.quantity * item.discount / 100),
               lineTotal: Math.round(
-                item.product.sellingPrice *
+                (item.type === "product" ? item.product.sellingPrice : item.unitPrice) *
                   item.quantity *
                   (1 - item.discount / 100)
               ),
             })),
-            subtotal: taxableAmount,
+            subtotal,
             taxAmount: tax,
             total: grandTotal,
             paymentMethod,
@@ -542,28 +582,40 @@ const grandTotal = taxableAmount + tax;
             </div>
 
             <span className="rounded-full bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600">
-              Tax {taxEnabled ? "enabled · 18%" : "disabled"}
+              Tax {taxEnabled ? `enabled · ${taxRate}%` : "disabled"}
             </span>
           </div>
 
-          <label className="flex h-11 items-center gap-3 rounded-lg border border-slate-300 bg-white px-3 focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-100">
-            <Search size={18} className="shrink-0 text-slate-400" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search product, SKU or scan barcode"
-              className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-slate-400"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="text-slate-400 hover:text-slate-700"
-                aria-label="Clear search"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <label className="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg border border-slate-300 bg-white px-3 focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-100">
+              <Search size={18} className="shrink-0 text-slate-400" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search product, SKU or scan barcode" className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-slate-400" />
+              {search && <button type="button" onClick={() => setSearch("")} className="text-slate-400 hover:text-slate-700" aria-label="Clear search"><X size={16} /></button>}
+            </label>
+            <button type="button" onClick={() => { setCustomItemError(""); setShowCustomItemForm(true); }} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700">
+              <Plus size={17} /> Add custom item
+            </button>
+          </div>
+
+          {showCustomItemForm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCustomItemForm(false); }}>
+              <form onSubmit={addCustomItem} className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="custom-item-title">
+                <div className="mb-5 flex items-start justify-between gap-3">
+                  <div><h2 id="custom-item-title" className="text-lg font-bold text-slate-900">Add custom item</h2><p className="mt-1 text-sm text-slate-500">Add a one-off service or charge without changing inventory.</p></div>
+                  <button type="button" onClick={() => setShowCustomItemForm(false)} aria-label="Close" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={18} /></button>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block text-sm font-medium text-slate-700 sm:col-span-2">Description <input autoFocus required maxLength={200} value={customItemName} onChange={(event) => setCustomItemName(event.target.value)} placeholder="e.g. Installation labour" className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-sky-500" /></label>
+                  <label className="block text-sm font-medium text-slate-700">Item type <select value={customItemType} onChange={(event) => setCustomItemType(event.target.value as CustomCartItem["itemType"])} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option>Service</option><option>Labour</option><option>Material</option><option>Other</option></select></label>
+                  <label className="block text-sm font-medium text-slate-700">Quantity <input required type="number" min="1" step="1" value={customItemQuantity} onChange={(event) => setCustomItemQuantity(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
+                  <label className="block text-sm font-medium text-slate-700">Unit price (UGX) <input required type="number" min="0" step="1" value={customItemPrice} onChange={(event) => setCustomItemPrice(event.target.value)} placeholder="0" className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
+                  <label className="block text-sm font-medium text-slate-700">Line discount (%) <input type="number" min="0" max="100" step="0.01" value={customItemDiscount} onChange={(event) => setCustomItemDiscount(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
+                </div>
+                {customItemError && <p role="alert" className="mt-3 text-sm text-red-600">{customItemError}</p>}
+                <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setShowCustomItemForm(false)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button><button type="submit" className="rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700">Add to sale</button></div>
+              </form>
+            </div>
+          )}
 
           <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
             {categories.map((item) => (
@@ -603,7 +655,7 @@ const grandTotal = taxableAmount + tax;
               {filteredProducts.map((product) => {
                 const quantityInCart =
                   cart.find(
-                    (item) => getProductId(item.product) === getProductId(product),
+                    (item) => item.type === "product" && getProductId(item.product) === getProductId(product),
                   )?.quantity ?? 0;
 
                 const unavailable = product.quantity < 1;
@@ -798,22 +850,27 @@ const grandTotal = taxableAmount + tax;
             ) : (
               <div className="divide-y divide-slate-200">
                 {cart.map((item) => (
-                  <div key={item.product.id} className="py-4 first:pt-0">
+                  <div key={item.type === "product" ? item.product.id : item.id} className="py-4 first:pt-0">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="text-xs font-semibold leading-5 text-slate-800">
-                          {item.product.name}
+                          {item.type === "product" ? item.product.name : item.name}
                         </h3>
+                        <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.type === "custom" ? "bg-violet-50 text-violet-700" : "bg-slate-100 text-slate-600"}`}>
+                          {item.type === "product" ? "Inventory product" : `${item.itemType} · Custom`}
+                        </span>
                         <p className="mt-1 text-[11px] text-slate-500">
-                          {money(item.product.sellingPrice)} each
+                          {money(item.type === "product" ? item.product.sellingPrice : item.unitPrice)} each
                         </p>
                       </div>
 
                       <button
                         onClick={() =>
                           setCart((current) =>
-                            current.filter(
-                              (entry) => entry.product.id !== item.product.id,
+                            current.filter((entry) =>
+                              item.type === "product"
+                                ? entry.type !== "product" || entry.product.id !== item.product.id
+                                : entry.type !== "custom" || entry.id !== item.id,
                             ),
                           )
                         }
@@ -826,9 +883,9 @@ const grandTotal = taxableAmount + tax;
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex h-8 items-center overflow-hidden rounded-md border border-slate-200">
                         <button
-                          onClick={() => updateQuantity(item.product.id, -1)}
+                          onClick={() => updateQuantity(item.type === "product" ? item.product.id : item.id, -1)}
                           className="h-full px-2.5 text-slate-600 hover:bg-slate-100"
-                          aria-label={`Decrease ${item.product.name} quantity`}
+                          aria-label={`Decrease ${item.type === "product" ? item.product.name : item.name} quantity`}
                         >
                           <Minus size={13} />
                         </button>
@@ -838,10 +895,10 @@ const grandTotal = taxableAmount + tax;
                         </span>
 
                         <button
-                          onClick={() => updateQuantity(item.product.id, 1)}
-                          disabled={item.quantity >= item.product.quantity}
+                          onClick={() => updateQuantity(item.type === "product" ? item.product.id : item.id, 1)}
+                          disabled={item.type === "product" && item.quantity >= item.product.quantity}
                           className="h-full px-2.5 text-slate-600 hover:bg-slate-100 disabled:text-slate-300"
-                          aria-label={`Increase ${item.product.name} quantity`}
+                          aria-label={`Increase ${item.type === "product" ? item.product.name : item.name} quantity`}
                         >
                           <Plus size={13} />
                         </button>
@@ -850,11 +907,11 @@ const grandTotal = taxableAmount + tax;
                       <label className="flex items-center gap-1.5 text-[11px] text-sky-600">
                         Line discount
                         <select
-                          aria-label={`Discount for ${item.product.name}`}
+                          aria-label={`Discount for ${item.type === "product" ? item.product.name : item.name}`}
                           value={item.discount}
                           onChange={(event) =>
                             updateLineDiscount(
-                              item.product.id,
+                              item.type === "product" ? item.product.id : item.id,
                               event.target.value,
                             )
                           }
@@ -870,7 +927,7 @@ const grandTotal = taxableAmount + tax;
 
                       <strong className="ml-auto text-sm">
                         {money(
-                          item.product.sellingPrice *
+                          (item.type === "product" ? item.product.sellingPrice : item.unitPrice) *
                             item.quantity *
                             (1 - item.discount / 100),
                         )}
@@ -1223,7 +1280,7 @@ const grandTotal = taxableAmount + tax;
                     <td className="py-3 pr-3">
                       <p className="font-medium">{item.name}</p>
                       <p className="text-xs text-slate-500">
-                        {item.sku}
+                        {item.type === "custom" ? `${item.customType || "Other"} · Custom item` : item.sku || ""}
                         {item.discountPercent
                           ? ` · ${item.discountPercent}% discount`
                           : ""}

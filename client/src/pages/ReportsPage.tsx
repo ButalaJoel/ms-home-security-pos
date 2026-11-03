@@ -9,7 +9,7 @@ import {
   RefreshCw,
   Wallet,
 } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { API_BASE, apiFetch } from "../lib/api";
 
 // API records reflect the sales and product documents stored by the backend.
 type SaleItem = {
@@ -60,7 +60,7 @@ type Product = {
 type Period = "Daily" | "Weekly" | "Monthly";
 type ReportType = "Sales" | "Products" | "Stock" | "Low stock" | "Balances" | "Profit";
 
-const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+const API_URL = (API_BASE).replace(/\/$/, "");
 const PAGE_SIZE = 8;
 
 const reportLibrary: {

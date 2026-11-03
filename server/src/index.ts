@@ -62,10 +62,17 @@ app.use(
         process.env.NODE_ENV !== "production" &&
         /^http:\/\/localhost:\d+$/.test(origin || "");
 
+      // Vercel preview deployments of this project get their own URLs.
+      const isVercelPreviewOrigin =
+        /^https:\/\/ms-home-security-[a-z0-9-]+-btljoel97-2713s-projects\.vercel\.app$/.test(
+          origin || "",
+        );
+
       if (
         !origin ||
         allowedOrigins.includes(origin) ||
-        isLocalDevelopmentOrigin
+        isLocalDevelopmentOrigin ||
+        isVercelPreviewOrigin
       ) {
         callback(null, true);
         return;
@@ -1412,17 +1419,23 @@ app.put("/api/customers/:id", async (req: Request, res: Response) => {
 // ---------------------------------------------------------
 
 type SaleItemInput = {
-  productId: string;
+  type?: "product" | "custom";
+  productId?: string;
+  name?: string;
+  customType?: "Service" | "Labour" | "Material" | "Other";
+  unitPrice?: number;
   quantity: number;
   discount?: number; // Per-line discount percentage from 0 to 100.
 };
 
 type SaleLine = {
-  productId: ObjectId;
+  type: "product" | "custom";
+  productId?: ObjectId;
+  customType?: "Service" | "Labour" | "Material" | "Other";
   name: string;
-  sku: string;
-  category: string;
-  brand: string;
+  sku?: string;
+  category?: string;
+  brand?: string;
   unitPrice: number;
   quantity: number;
   discountPercent: number;
@@ -1678,32 +1691,28 @@ const paymentMethod = cleanString(req.body?.paymentMethod);
     const taxEnabled = req.body?.taxEnabled === true;
     const allowedPaymentMethods = ["Cash", "Mobile Money", "Bank transfer", "Card"];
 
-    if (!Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ success: false, message: "Add at least one product to the sale." });
+    if (!Array.isArray(items) || items.length === 0 || items.length > 200) {
+      res.status(400).json({ success: false, message: "Add between 1 and 200 items to the sale." });
       return;
     }
     if (!allowedPaymentMethods.includes(paymentMethod)) {
       res.status(400).json({ success: false, message: "Select a valid payment method." });
       return;
     }
-    if (!isNonNegativeNumber(amountPaidInput)) {
+    if (!isNonNegativeNumber(amountPaidInput) || amountPaidInput > Number.MAX_SAFE_INTEGER) {
       res.status(400).json({ success: false, message: "Amount paid must be a non-negative number." });
       return;
     }
-    if (!isNonNegativeNumber(overallDiscountInput)) {
+    if (!isNonNegativeNumber(overallDiscountInput) || overallDiscountInput > Number.MAX_SAFE_INTEGER) {
       res.status(400).json({ success: false, message: "Overall discount must be a non-negative amount." });
       return;
     }
 
-    // Combine repeated product lines so a product cannot bypass stock checks
-    // by being added to the cart more than once.
+    // Validate each line and aggregate registered products for atomic stock checks.
     const combined = new Map<string, { quantity: number; discount: number }>();
+    const customItemTypes = ["Service", "Labour", "Material", "Other"] as const;
     for (const item of items) {
-      if (!item || typeof item.productId !== "string" || !getProductId(item.productId)) {
-        res.status(400).json({ success: false, message: "A sale contains an invalid product ID." });
-        return;
-      }
-      if (!isPositiveInteger(item.quantity)) {
+      if (!item || !Number.isSafeInteger(item.quantity) || item.quantity <= 0) {
         res.status(400).json({ success: false, message: "Each sale quantity must be a positive whole number." });
         return;
       }
@@ -1713,13 +1722,47 @@ const paymentMethod = cleanString(req.body?.paymentMethod);
         return;
       }
 
+      if (item.type === "custom") {
+        if (typeof item.name !== "string" || !item.name.trim() || item.name.trim().length > 200) {
+          res.status(400).json({ success: false, message: "Custom item descriptions must be between 1 and 200 characters." });
+          return;
+        }
+        if (!isNonNegativeNumber(item.unitPrice)) {
+          res.status(400).json({ success: false, message: "Custom item prices must be non-negative numbers." });
+          return;
+        }
+        if (item.unitPrice > Number.MAX_SAFE_INTEGER || !Number.isFinite(item.unitPrice * item.quantity) || item.unitPrice * item.quantity > Number.MAX_SAFE_INTEGER) {
+          res.status(400).json({ success: false, message: "Custom item line totals exceed the supported amount." });
+          return;
+        }
+        if (item.customType !== undefined && !customItemTypes.includes(item.customType)) {
+          res.status(400).json({ success: false, message: "Select a valid custom item type." });
+          return;
+        }
+        continue;
+      }
+
+      if (item.type !== undefined && item.type !== "product") {
+        res.status(400).json({ success: false, message: "Select a valid sale line type." });
+        return;
+      }
+      if (typeof item.productId !== "string" || !getProductId(item.productId)) {
+        res.status(400).json({ success: false, message: "A sale contains an invalid product ID." });
+        return;
+      }
+
       const previous = combined.get(item.productId);
       if (previous && previous.discount !== discount) {
         res.status(400).json({ success: false, message: "The same product cannot have different discounts on separate lines." });
         return;
       }
+      const combinedQuantity = (previous?.quantity ?? 0) + item.quantity;
+      if (!Number.isSafeInteger(combinedQuantity)) {
+        res.status(400).json({ success: false, message: "Combined product quantity exceeds the supported amount." });
+        return;
+      }
       combined.set(item.productId, {
-        quantity: (previous?.quantity ?? 0) + item.quantity,
+        quantity: combinedQuantity,
         discount,
       });
     }
@@ -1764,8 +1807,10 @@ if (customerId) {
 
     await session.withTransaction(async () => {
       const saleLines: SaleLine[] = [];
+      const productsById = new Map<string, Document>();
 
-      // Read and validate every product inside the transaction before changing stock.
+      // Read every registered product inside the transaction. Custom lines never
+      // look up inventory and are never considered for stock deduction.
       for (const [id, requested] of combined.entries()) {
         const productId = new ObjectId(id);
         const product = await products.findOne(
@@ -1779,29 +1824,58 @@ if (customerId) {
         if (product.quantity < requested.quantity) {
           throw new Error(`INSUFFICIENT_STOCK:${product.name}:${product.quantity}`);
         }
+        productsById.set(id, product);
+      }
 
-        // Calculate all monetary values on the server using the saved selling price.
+      // Build saved lines in the same order as the cashier entered them.
+      for (const item of items) {
+        const discountPercent = item.discount ?? 0;
+        if (item.type === "custom") {
+          const unitPrice = item.unitPrice!;
+          const grossLine = unitPrice * item.quantity;
+          const discountAmount = Math.round((grossLine * discountPercent) / 100);
+          saleLines.push({
+            type: "custom",
+            customType: item.customType ?? "Other",
+            name: item.name!.trim(),
+            unitPrice,
+            quantity: item.quantity,
+            discountPercent,
+            discountAmount,
+            lineTotal: grossLine - discountAmount,
+          });
+          continue;
+        }
+
+        const product = productsById.get(item.productId!)!;
         const unitPrice = Number(product.sellingPrice);
-        if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        if (!Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > Number.MAX_SAFE_INTEGER) {
           throw new Error(`INVALID_PRICE:${product.name}`);
         }
-        const grossLine = unitPrice * requested.quantity;
-        const discountAmount = Math.round((grossLine * requested.discount) / 100);
+        const grossLine = unitPrice * item.quantity;
+        if (!Number.isFinite(grossLine) || grossLine > Number.MAX_SAFE_INTEGER) {
+          throw new Error(`INVALID_PRICE:${product.name}`);
+        }
+        const discountAmount = Math.round((grossLine * discountPercent) / 100);
         saleLines.push({
-          productId,
-          name: product.name,
-          sku: product.sku,
-          category: product.category,
-          brand: product.brand,
+          type: "product",
+          productId: new ObjectId(item.productId!),
+          name: String(product.name ?? ""),
+          sku: String(product.sku ?? ""),
+          category: String(product.category ?? ""),
+          brand: String(product.brand ?? ""),
           unitPrice,
-          quantity: requested.quantity,
-          discountPercent: requested.discount,
+          quantity: item.quantity,
+          discountPercent,
           discountAmount,
           lineTotal: grossLine - discountAmount,
         });
       }
 
       const subtotal = saleLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+      if (!Number.isFinite(subtotal) || subtotal > Number.MAX_SAFE_INTEGER) {
+        throw new Error("SALE_TOTAL_OUT_OF_RANGE");
+      }
       const lineDiscountTotal = saleLines.reduce((sum, line) => sum + line.discountAmount, 0);
       const beforeOverallDiscount = Math.max(0, subtotal - lineDiscountTotal);
       const overallDiscount = Math.min(overallDiscountInput, beforeOverallDiscount);
@@ -1847,6 +1921,7 @@ const grandTotal = taxableAmount + tax;
 
       // Use conditional stock updates as an extra guard against overselling.
       for (const line of saleLines) {
+        if (line.type !== "product" || !line.productId) continue;
         const previous = await products.findOne(
           { _id: line.productId },
           { session, projection: { quantity: 1 } }
@@ -1868,7 +1943,7 @@ const grandTotal = taxableAmount + tax;
         await adjustments.insertOne({
           productId: line.productId,
           productName: line.name,
-          sku: line.sku,
+          sku: line.sku ?? "",
           type: "Stock issued",
           quantity: line.quantity,
           previousQuantity: previous.quantity,
@@ -1893,9 +1968,10 @@ customerEmail,
 customerAddress,
 customerType,
 
-  items: saleLines.map((line) => ({          ...line,
-          productId: String(line.productId),
-        })),
+      items: saleLines.map((line) => ({
+        ...line,
+        ...(line.productId ? { productId: String(line.productId) } : {}),
+      })),
         subtotal,
         lineDiscountTotal,
         overallDiscount,
@@ -1967,9 +2043,16 @@ app.use(
     error: Error,
     _req: Request,
     res: Response,
-    _next: NextFunction
+    next: NextFunction
   ) => {
     console.error("API middleware error:", error.message);
+
+    // If a response has already started, let Express close it instead of
+    // trying to send a second one (this caused ERR_HTTP_HEADERS_SENT).
+    if (res.headersSent) {
+      next(error);
+      return;
+    }
 
     if (error instanceof multer.MulterError) {
       res.status(400).json({

@@ -8,4 +8,10 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    // Lets `npm run dev` call /api on the local server without CORS issues.
+    proxy: {
+      '/api': 'http://localhost:5000',
+    },
+  },
 })

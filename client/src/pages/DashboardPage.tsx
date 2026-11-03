@@ -13,9 +13,8 @@ import {
   Plus,
   RefreshCw,
 } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { API_BASE, apiFetch } from "../lib/api";
 
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 const formatUGX = (amount: number) =>
   `UGX ${Number(amount || 0).toLocaleString("en-UG", { maximumFractionDigits: 0 })}`;
 

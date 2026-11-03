@@ -11,11 +11,11 @@ import {
   X,
   RefreshCw,
 } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { API_BASE, apiFetch } from "../lib/api";
 
 // Keep the API URL configurable for development and deployment.
 const API_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000"
+  API_BASE
 ).replace(/\/$/, "");
 
 type Product = {

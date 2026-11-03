@@ -49,7 +49,7 @@ import {
   Trash2,
 
 } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { API_BASE, apiFetch } from "../lib/api";
 
 
 
@@ -75,6 +75,7 @@ type QuoteItem = {
 
 
 type SaleLine = {
+  type?: "product" | "custom"; customType?: "Service" | "Labour" | "Material" | "Other";
   productId?: string; name?: string; productName?: string; description?: string;
   sku?: string; quantity: number; unitPrice?: number; price?: number;
   lineDiscountAmount?: number; lineTotal?: number; total?: number;
@@ -380,7 +381,7 @@ export default function DocumentsPage() {
 
         const apiBase = (
 
-          import.meta.env.VITE_API_URL || "http://localhost:5000"
+          API_BASE
 
         ).replace(/\/+$/, "");
 
@@ -520,7 +521,7 @@ export default function DocumentsPage() {
     setSalesLoading(true);
     setSalesError("");
     try {
-      const apiBase = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+      const apiBase = (API_BASE).replace(/\/+$/, "");
       const response = await apiFetch(`${apiBase}/api/sales?limit=200`);
       if (!response.ok) throw new Error(`Sales request failed (${response.status})`);
       const payload = await response.json();
@@ -554,7 +555,10 @@ export default function DocumentsPage() {
       const qty = Number(item.quantity || 0);
       const price = Number(item.unitPrice ?? item.price ?? 0);
       const line = Number(item.lineTotal ?? item.total ?? qty * price);
-      return `<tr><td>${escapeHtml(name)}${item.sku ? `<div class="muted">SKU: ${escapeHtml(item.sku)}</div>` : ""}</td><td class="num">${qty}</td><td class="num">${escapeHtml(formatUGX(price))}</td><td class="num">${escapeHtml(formatUGX(line))}</td></tr>`;
+      const itemNote = item.type === "custom"
+        ? `<div class="muted">${escapeHtml(item.customType || "Other")} · Custom item</div>`
+        : item.sku ? `<div class="muted">SKU: ${escapeHtml(item.sku)}</div>` : "";
+      return `<tr><td>${escapeHtml(name)}${itemNote}</td><td class="num">${qty}</td><td class="num">${escapeHtml(formatUGX(price))}</td><td class="num">${escapeHtml(formatUGX(line))}</td></tr>`;
     }).join("");
     const logo = companyLogo
       ? `<img class="logo" src="${escapeHtml(companyLogo)}" alt="Company logo">`
@@ -2415,7 +2419,7 @@ const configuredTaxRate = (() => {
                 <div className="sm:text-right"><h2 className="text-2xl font-extrabold">{selectedDocument.kind === "invoice" ? "INVOICE" : "RECEIPT"}</h2><p className="mt-1 text-sm font-bold text-sky-700">{selectedDocument.kind === "invoice" ? `INV-${saleReference(selectedDocument.sale).replace(/^MS-/, "")}` : saleReference(selectedDocument.sale)}</p><p className="text-sm text-slate-500">{selectedDocument.sale.createdAt ? new Date(selectedDocument.sale.createdAt).toLocaleString("en-GB") : "Date unavailable"}</p><p className="mt-2 text-sm">Payment status: <strong>{salePaymentStatus(selectedDocument.sale)}</strong></p></div>
               </div>
               <div className="mt-5 rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{selectedDocument.kind === "invoice" ? "Bill to" : "Payment received from"}</p><p className="mt-1 font-semibold">{saleCustomerName(selectedDocument.sale)}</p><p className="mt-2 text-sm text-slate-500">Payment method: {selectedDocument.sale.paymentMethod || "Not recorded"}</p></div>
-              <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="bg-slate-800 text-white"><th className="p-3">Description</th><th className="p-3 text-right">Qty</th><th className="p-3 text-right">Unit price</th><th className="p-3 text-right">Line total</th></tr></thead><tbody>{(selectedDocument.sale.items || []).map((item, index) => <tr key={`${item.productId || item.sku || item.name || "line"}-${index}`} className="border-b border-slate-200"><td className="p-3">{item.name || item.productName || item.description || "Item"}{item.sku && <p className="text-xs text-slate-400">SKU: {item.sku}</p>}</td><td className="p-3 text-right">{item.quantity}</td><td className="p-3 text-right">{formatUGX(Number(item.unitPrice ?? item.price ?? 0))}</td><td className="p-3 text-right font-semibold">{formatUGX(Number(item.lineTotal ?? item.total ?? Number(item.quantity || 0) * Number(item.unitPrice ?? item.price ?? 0)))}</td></tr>)}</tbody></table></div>
+              <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="bg-slate-800 text-white"><th className="p-3">Description</th><th className="p-3 text-right">Qty</th><th className="p-3 text-right">Unit price</th><th className="p-3 text-right">Line total</th></tr></thead><tbody>{(selectedDocument.sale.items || []).map((item, index) => <tr key={`${item.productId || item.sku || item.name || "line"}-${index}`} className="border-b border-slate-200"><td className="p-3">{item.name || item.productName || item.description || "Item"}{item.type === "custom" ? <p className="text-xs text-violet-700">{item.customType || "Other"} · Custom item</p> : item.sku && <p className="text-xs text-slate-400">SKU: {item.sku}</p>}</td><td className="p-3 text-right">{item.quantity}</td><td className="p-3 text-right">{formatUGX(Number(item.unitPrice ?? item.price ?? 0))}</td><td className="p-3 text-right font-semibold">{formatUGX(Number(item.lineTotal ?? item.total ?? Number(item.quantity || 0) * Number(item.unitPrice ?? item.price ?? 0)))}</td></tr>)}</tbody></table></div>
               <div className="ml-auto mt-5 max-w-sm space-y-2 text-sm"><div className="flex justify-between gap-4"><span>Sale total</span><strong>{formatUGX(saleTotal(selectedDocument.sale))}</strong></div><div className="flex justify-between gap-4"><span>Amount paid</span><strong>{formatUGX(salePaid(selectedDocument.sale))}</strong></div><div className="flex justify-between gap-4"><span>Outstanding balance</span><strong>{formatUGX(saleBalance(selectedDocument.sale))}</strong></div>{selectedDocument.kind === "receipt" && Number(selectedDocument.sale.change || 0) > 0 && <div className="flex justify-between gap-4"><span>Change given</span><strong>{formatUGX(Number(selectedDocument.sale.change))}</strong></div>}</div>
               <p className="mt-6 border-t border-slate-200 pt-4 text-xs text-slate-500">Generated from a saved POS transaction. Choose Print / Save PDF to print or download a PDF copy.</p>
             </div>

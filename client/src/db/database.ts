@@ -20,10 +20,15 @@ export interface LocalSale {
   id: string;
   receiptNumber: string;
   items: Array<{
-    productId: string;
+    type: "product" | "custom";
+    productId?: string;
+    customType?: "Service" | "Labour" | "Material" | "Other";
     productName: string;
+    name: string;
     quantity: number;
     unitPrice: number;
+    discountPercent: number;
+    discountAmount: number;
     lineTotal: number;
   }>;
   subtotal: number;
@@ -71,6 +76,26 @@ class MSHomeSecurityDatabase extends Dexie {
       pendingSync: "++id, &operationId, operationType, recordId, createdAt",
       settings: "id",
     });
+
+    // Keep existing pending sales and normalize their old product-only lines.
+    this.version(2)
+      .stores({
+        products: "id, sku, name, category, updatedAt",
+        sales: "id, receiptNumber, createdAt, syncStatus",
+        pendingSync: "++id, &operationId, operationType, recordId, createdAt",
+        settings: "id",
+      })
+      .upgrade(async (transaction) => {
+        await transaction.table("sales").toCollection().modify((sale: LocalSale) => {
+          sale.items = sale.items.map((item) => ({
+            ...item,
+            type: item.type ?? "product",
+            name: item.name ?? item.productName,
+            discountPercent: item.discountPercent ?? 0,
+            discountAmount: item.discountAmount ?? 0,
+          }));
+        });
+      });
   }
 }
 

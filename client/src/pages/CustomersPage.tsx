@@ -15,7 +15,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-import { apiFetch } from "../lib/api";
+import { API_BASE, apiFetch } from "../lib/api";
 
 // Customer profiles are derived from completed sales. This prevents demo-only
 // customers from appearing before they have made a transaction.
@@ -51,7 +51,7 @@ type SaleRecord = {
   createdAt?: string;
 };
 
-const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+const API_URL = (API_BASE).replace(/\/+$/, "");
 const PAGE_SIZE = 8;
 
 const formatUGX = (amount: number) =>

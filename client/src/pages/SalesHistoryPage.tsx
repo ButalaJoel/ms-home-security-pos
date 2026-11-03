@@ -9,10 +9,12 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { API_BASE, apiFetch } from "../lib/api";
 
 // Sales are loaded from the backend, not from hardcoded demo records.
 type SaleItem = {
+  type?: "product" | "custom";
+  customType?: "Service" | "Labour" | "Material" | "Other";
   name: string;
   sku?: string;
   quantity: number;
@@ -44,7 +46,7 @@ type Sale = {
 };
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000"
+  API_BASE
 ).replace(/\/$/, "");
 
 const formatUGX = (amount: number) =>
@@ -117,6 +119,8 @@ export default function SalesHistoryPage() {
           items: rawItems.map((entry) => {
             const item = entry as Record<string, unknown>;
             return {
+              type: item.type === "custom" ? "custom" : "product",
+              customType: item.customType === "Service" || item.customType === "Labour" || item.customType === "Material" || item.customType === "Other" ? item.customType : undefined,
               name: String(item.name ?? "Product"),
               sku: item.sku ? String(item.sku) : "",
               quantity: Number(item.quantity ?? 0),
@@ -470,7 +474,7 @@ export default function SalesHistoryPage() {
                 <tbody className="divide-y divide-slate-100">
                   {selectedSale.items.map((item, index) => (
                     <tr key={`${item.sku}-${index}`}>
-                      <td className="py-3 pr-3"><p className="font-medium">{item.name}</p>{item.sku && <p className="mt-1 text-xs text-slate-500">{item.sku}</p>}</td>
+                      <td className="py-3 pr-3"><p className="font-medium">{item.name}</p>{item.type === "custom" ? <p className="mt-1 text-xs text-violet-700">{item.customType || "Other"} · Custom item</p> : item.sku && <p className="mt-1 text-xs text-slate-500">{item.sku}</p>}</td>
                       <td className="px-2 py-3 text-right">{item.quantity}</td>
                       <td className="px-2 py-3 text-right">{formatUGX(item.unitPrice)}</td>
                       <td className="py-3 pl-2 text-right font-medium">{formatUGX(item.lineTotal)}</td>
