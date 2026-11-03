@@ -17,6 +17,7 @@ const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 // Ordered most specific first. The first match describes the request.
 const DESCRIPTIONS: { pattern: RegExp; method?: string; area: string; action: string }[] = [
+  { pattern: /^\/api\/backup\/restore$/, area: "Backups", action: "Restored data from a backup" },
   { pattern: /^\/api\/auth\/login$/, area: "Account", action: "Signed in" },
   { pattern: /^\/api\/auth\/logout$/, area: "Account", action: "Signed out" },
   { pattern: /^\/api\/auth\//, area: "Account", action: "Changed account" },

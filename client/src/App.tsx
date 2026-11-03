@@ -1,4 +1,5 @@
 import NotificationBell from "./components/layout/NotificationBell";
+import BackupReminder from "./components/BackupReminder";
 
 import { useEffect, useState } from "react";
 import {
@@ -141,6 +142,7 @@ function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onMenuClick={() => setMobileOpen(true)} />
         <NotificationBell />
+        <BackupReminder />
 
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2 sm:px-6">
           <div className="min-w-0">

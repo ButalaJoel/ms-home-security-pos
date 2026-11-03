@@ -48,6 +48,7 @@ import supplierRoutes from "./features/suppliers.js";
 import expenseRoutes from "./features/expenses.js";
 import productPhotoRoutes from "./features/productPhotos.js";
 import productImportRoutes from "./features/productImport.js";
+import backupRoutes from "./features/backup.js";
 const app = express();
 app.set('trust proxy', 1);
 const port = Number(process.env.PORT) || 5000;
@@ -2147,6 +2148,7 @@ app.use("/api/quotations", quotationRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/serials", serialRoutes);
 app.use("/api/activity", activityRoutes);
+app.use("/api/backup", backupRoutes);
 app.use("/api", supplierRoutes); // /api/suppliers, /api/stock-receipts
 app.use("/api", expenseRoutes); // /api/expenses, /api/cashups, /api/reports/profit
 
@@ -2211,7 +2213,7 @@ app.use(
         success: false,
         message:
           error.code === "LIMIT_FILE_SIZE"
-            ? "Image must not exceed 5 MB."
+            ? "The file is too large."
             : "Image upload error.",
       });
       return;

@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { API_BASE, apiFetch } from "../lib/api";
 import UsersPage from "./UsersPage";
+import BackupPanel from "../components/BackupPanel";
+import ConnectionPanel from "../components/ConnectionPanel";
 import { useAuth } from "../context/AuthContext";
 
 type SettingSection =
@@ -103,7 +105,11 @@ const labelClass = "block text-xs font-medium text-[#526985]";
 export default function SettingsPage() {
   const { user } = useAuth();
   const [activeSection, setActiveSection] =
-    useState<SettingSection>("business");
+    useState<SettingSection>(() => {
+      // Deep link, e.g. /settings?section=backups from the backup reminder.
+      const requested = new URLSearchParams(window.location.search).get("section");
+      return requested === "backups" || requested === "sync" ? requested : "business";
+    });
 
   const [settings, setSettings] =
     useState<BusinessSettings>(initialSettings);
@@ -370,25 +376,6 @@ const loaded: BusinessSettings = {
     <div className="border-b border-[#dce5f0] pb-5">
       <h2 className="font-semibold text-[#10213b]">{title}</h2>
       <p className="mt-1 text-xs text-[#7a8eaa]">{description}</p>
-    </div>
-  );
-
-  const renderComingSoon = (
-    title: string,
-    description: string,
-    Icon: typeof Building2,
-  ) => (
-    <div className="flex min-h-[300px] flex-col items-center justify-center px-6 py-12 text-center">
-      <div className="mb-5 rounded-full bg-[#f1f6fb] p-4">
-        <Icon size={34} className="text-[#94a6bf]" />
-      </div>
-      <h3 className="text-sm font-semibold text-[#10213b]">{title}</h3>
-      <p className="mt-2 max-w-md text-sm leading-6 text-[#7a8eaa]">
-        {description}
-      </p>
-      <p className="mt-3 text-xs text-[#94a6bf]">
-        Configuration will be connected in a later phase.
-      </p>
     </div>
   );
 
@@ -728,38 +715,10 @@ const loaded: BusinessSettings = {
         return <UsersPage />;
 
       case "backups":
-        return renderComingSoon(
-          "Data & backups",
-          "Backup scheduling, data export, restore tools and recovery controls will be configured here.",
-          Database,
-        );
+        return <BackupPanel />;
 
       case "sync":
-        return (
-          <>
-            {sectionHeading(
-              "Connection & sync",
-              "Connection and synchronisation status for the shop system.",
-            )}
-            <div className="mt-5 flex flex-wrap items-center gap-4 rounded-lg border border-[#a9e7bf] bg-[#eaf9ef] p-4">
-              <div className="rounded-full bg-[#16a34a] p-3 text-white">
-                <Wifi size={20} />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-[#14532d]">
-                  Interface preview
-                </p>
-                <p className="mt-1 text-xs text-[#43815b]">
-                  Live connection and synchronisation status are not
-                  connected yet.
-                </p>
-              </div>
-              <span className="text-xs font-semibold text-[#15803d]">
-                Demo
-              </span>
-            </div>
-          </>
-        );
+        return <ConnectionPanel />;
     }
   };
 
@@ -850,7 +809,7 @@ const loaded: BusinessSettings = {
             renderSection()
           )}
 
-          {activeSection !== "users" && (
+          {activeSection !== "users" && activeSection !== "backups" && activeSection !== "sync" && (
           <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-[#dce5f0] pt-5">
             <button
               type="button"
@@ -880,7 +839,7 @@ const loaded: BusinessSettings = {
 
 
 
-          <p className={`mt-4 text-[11px] leading-5 text-[#8a9db6] ${activeSection === "users" ? "hidden" : ""}`}>
+          <p className={`mt-4 text-[11px] leading-5 text-[#8a9db6] ${activeSection === "users" || activeSection === "backups" || activeSection === "sync" ? "hidden" : ""}`}>
             Active section: {active.label}. Settings are loaded from and
             saved through the connected backend.
           </p>
