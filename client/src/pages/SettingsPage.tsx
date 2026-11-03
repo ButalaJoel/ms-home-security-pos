@@ -525,7 +525,7 @@ const loaded: BusinessSettings = {
               {renderSelect("Default payment arrangement", "paymentTerms", [
                 {
                   label:
-                    "Full payment for products; 50/30/20 for installation",
+                    "Full payment for products; 70% deposit / 30% on handover for installation",
                   value: "full_purchase_installment_project",
                 },
                 {
@@ -533,8 +533,8 @@ const loaded: BusinessSettings = {
                   value: "full_payment_before_supply",
                 },
                 {
-                  label: "50% deposit, 30% progress, 20% completion",
-                  value: "50_30_20_installation",
+                  label: "70% deposit, 30% on handover (installation jobs)",
+                  value: "70_30_installation",
                 },
               ])}
               {renderField("Warranty duration", "warrantyDuration")}
