@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { API_BASE, apiFetch } from "../lib/api";
 import { amountInWords } from "../lib/format";
+import NumberInput from "../components/NumberInput";
 import { cacheProducts, getCachedProducts } from "../db/offlineService";
 
 // Product records are loaded from MongoDB through the backend API.
@@ -412,8 +413,19 @@ const grandTotal = taxableAmount + tax;
     );
   }
 
-  function updateLinePrice(productId: string, value: string) {
-    const price = Math.max(0, Math.round(Number(value) || 0));
+  // Typed quantity; products are capped at the stock available.
+  function setLineQuantity(lineId: string, value: number) {
+    setCart((current) =>
+      current.map((item) => {
+        if ((item.type === "product" ? getProductId(item.product) : item.id) !== lineId) return item;
+        const limit = item.type === "product" ? Math.max(1, item.product.quantity) : Number.MAX_SAFE_INTEGER;
+        return { ...item, quantity: Math.min(limit, Math.max(1, Math.floor(value))) };
+      }),
+    );
+  }
+
+  function updateLinePrice(productId: string, value: number) {
+    const price = Math.max(0, Math.round(value));
     setCart((current) =>
       current.map((item) =>
         item.type === "product" && getProductId(item.product) === productId ? { ...item, price } : item,
@@ -904,12 +916,10 @@ const grandTotal = taxableAmount + tax;
                           <div className="mt-1 text-[11px] text-slate-500">
                             <label className="flex flex-wrap items-center gap-1.5">
                               Price each
-                              <input
-                                type="number"
-                                min={item.product.costPrice || 0}
-                                step={1000}
+                              <NumberInput
+                                min={0}
                                 value={item.price}
-                                onChange={(event) => updateLinePrice(getProductId(item.product), event.target.value)}
+                                onValueChange={(value) => updateLinePrice(getProductId(item.product), value)}
                                 aria-label={`Agreed price for ${item.product.name}`}
                                 className={`w-28 rounded border px-1.5 py-1 text-xs text-slate-800 ${item.product.costPrice && item.price < item.product.costPrice ? "border-red-400 bg-red-50" : "border-slate-200"}`}
                               />
@@ -954,9 +964,15 @@ const grandTotal = taxableAmount + tax;
                           <Minus size={13} />
                         </button>
 
-                        <span className="min-w-8 text-center text-xs font-semibold">
-                          {item.quantity}
-                        </span>
+                        <NumberInput
+                          integer
+                          min={1}
+                          max={item.type === "product" ? Math.max(1, item.product.quantity) : undefined}
+                          value={item.quantity}
+                          onValueChange={(value) => setLineQuantity(item.type === "product" ? getProductId(item.product) : item.id, value)}
+                          aria-label={`Quantity of ${item.type === "product" ? item.product.name : item.name}`}
+                          className="h-full w-12 border-x border-slate-200 bg-white text-center text-xs font-semibold text-slate-900 outline-none focus:bg-sky-50"
+                        />
 
                         <button
                           onClick={() => updateQuantity(item.type === "product" ? item.product.id : item.id, 1)}

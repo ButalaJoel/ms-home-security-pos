@@ -28,6 +28,7 @@ import { printHtml } from "../lib/share";
 import { useSettings } from "../lib/useSettings";
 import { PAYMENT_METHODS, type Customer, type PaymentMethod, type Product } from "../lib/types";
 import ShareDialog from "../components/ShareDialog";
+import NumberInput from "../components/NumberInput";
 import {
   EmptyState,
   Modal,
@@ -492,11 +493,11 @@ export default function QuotationsPage() {
                     </label>
                     <label className={`${labelClass} col-span-4 sm:col-span-2`}>
                       Qty
-                      <input className={inputClass} type="number" min={1} step={1} value={item.quantity} onChange={(e) => updateItem(item.key, { quantity: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} />
+                      <NumberInput className={inputClass} integer min={1} value={item.quantity} onValueChange={(quantity) => updateItem(item.key, { quantity })} aria-label="Quantity" />
                     </label>
                     <label className={`${labelClass} col-span-5 sm:col-span-3`}>
                       Unit price (UGX)
-                      <input className={inputClass} type="number" min={0} step={500} value={item.unitPrice} onChange={(e) => updateItem(item.key, { unitPrice: Math.max(0, Number(e.target.value) || 0) })} />
+                      <NumberInput className={inputClass} min={0} value={item.unitPrice} onValueChange={(unitPrice) => updateItem(item.key, { unitPrice })} aria-label="Unit price" />
                     </label>
                     <div className="col-span-3 flex items-end justify-end sm:col-span-1">
                       <button
