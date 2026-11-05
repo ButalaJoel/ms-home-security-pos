@@ -54,6 +54,7 @@ import { useNavigate } from "react-router-dom";
 import { Send } from "lucide-react";
 import ShareDialog from "../components/ShareDialog";
 import { invoiceNumber, saleDocumentHtml, type SaleForDocument } from "../lib/documents";
+import { amountInWords } from "../lib/format";
 
 
 
@@ -583,7 +584,7 @@ header{display:flex;justify-content:space-between;gap:20px;border-bottom:3px sol
 h1{font-size:23px;margin:0}h2{font-size:17px;margin:0}.muted{color:#64748b}.right{text-align:right}
 .panel{display:flex;justify-content:space-between;gap:20px;background:#f8fafc;padding:12px;margin:18px 0;border-radius:7px}
 table{width:100%;border-collapse:collapse;margin-top:18px}th{background:#172033;color:white;text-align:left}th,td{padding:10px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}.num{text-align:right;white-space:nowrap}
-.totals{width:320px;max-width:100%;margin:18px 0 0 auto}.row{display:flex;justify-content:space-between;gap:15px;padding:5px 0}.grand{border-top:2px solid #172033;margin-top:5px;padding-top:10px;font-size:16px;font-weight:bold}
+.totals{width:320px;max-width:100%;margin:18px 0 0 auto}.in-words{margin:14px 0 0;padding:9px 12px;background:#f8fafc;border-left:3px solid #0ea5e9}.row{display:flex;justify-content:space-between;gap:15px;padding:5px 0}.grand{border-top:2px solid #172033;margin-top:5px;padding-top:10px;font-size:16px;font-weight:bold}
 .notice{margin-top:18px;padding:12px;background:#f8fafc;border-left:3px solid #0ea5e9}.footer{border-top:1px solid #e2e8f0;margin-top:30px;padding-top:12px;color:#64748b;font-size:10px}
 @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head><body>
@@ -605,6 +606,9 @@ ${tax ? `<div class="row"><span>${escapeHtml(settingText("taxLabel", "Tax"))}</s
 <div class="row"><span>Amount ${isReceipt ? "received" : "paid"}</span><b>${escapeHtml(formatUGX(paid))}</b></div>
 <div class="row"><span>Outstanding balance</span><b>${escapeHtml(formatUGX(balance))}</b></div>
 ${isReceipt && Number(sale.change || 0) > 0 ? `<div class="row"><span>Change given</span><b>${escapeHtml(formatUGX(Number(sale.change)))}</b></div>` : ""}</div>
+${isReceipt
+  ? `<p class="in-words"><b>Amount received in words:</b> ${escapeHtml(amountInWords(paid))}</p>`
+  : `<p class="in-words"><b>Invoice total in words:</b> ${escapeHtml(amountInWords(total))}${balance > 0 && balance !== total ? `<br><b>Balance due in words:</b> ${escapeHtml(amountInWords(balance))}` : ""}</p>`}
 <div class="notice"><b>${isReceipt ? `Payment status: ${escapeHtml(status)}.` : "Payment terms:"}</b>
 ${isReceipt ? (paid > 0 ? " This receipt records the payment shown above against the saved sale." : " No payment is recorded as received.") : " Please settle the outstanding balance shown above and quote the invoice number when paying."}</div>
 <footer class="footer"><b>${escapeHtml(companyName)}</b><p>Thank you for your business. Generated from a saved POS transaction.</p></footer>
@@ -2366,7 +2370,7 @@ const configuredTaxRate = (() => {
               </div>
               <div className="mt-5 rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{selectedDocument.kind === "invoice" ? "Bill to" : "Payment received from"}</p><p className="mt-1 font-semibold">{saleCustomerName(selectedDocument.sale)}</p><p className="mt-2 text-sm text-slate-500">Payment method: {selectedDocument.sale.paymentMethod || "Not recorded"}</p></div>
               <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="bg-slate-800 text-white"><th className="p-3">Description</th><th className="p-3 text-right">Qty</th><th className="p-3 text-right">Unit price</th><th className="p-3 text-right">Line total</th></tr></thead><tbody>{(selectedDocument.sale.items || []).map((item, index) => <tr key={`${item.productId || item.sku || item.name || "line"}-${index}`} className="border-b border-slate-200"><td className="p-3">{item.name || item.productName || item.description || "Item"}{item.type === "custom" ? <p className="text-xs text-violet-700">{item.customType || "Other"} · Custom item</p> : item.sku && <p className="text-xs text-slate-400">SKU: {item.sku}</p>}</td><td className="p-3 text-right">{item.quantity}</td><td className="p-3 text-right">{formatUGX(Number(item.unitPrice ?? item.price ?? 0))}</td><td className="p-3 text-right font-semibold">{formatUGX(Number(item.lineTotal ?? item.total ?? Number(item.quantity || 0) * Number(item.unitPrice ?? item.price ?? 0)))}</td></tr>)}</tbody></table></div>
-              <div className="ml-auto mt-5 max-w-sm space-y-2 text-sm"><div className="flex justify-between gap-4"><span>Sale total</span><strong>{formatUGX(saleTotal(selectedDocument.sale))}</strong></div><div className="flex justify-between gap-4"><span>Amount paid</span><strong>{formatUGX(salePaid(selectedDocument.sale))}</strong></div><div className="flex justify-between gap-4"><span>Outstanding balance</span><strong>{formatUGX(saleBalance(selectedDocument.sale))}</strong></div>{selectedDocument.kind === "receipt" && Number(selectedDocument.sale.change || 0) > 0 && <div className="flex justify-between gap-4"><span>Change given</span><strong>{formatUGX(Number(selectedDocument.sale.change))}</strong></div>}</div>
+              <div className="ml-auto mt-5 max-w-sm space-y-2 text-sm"><div className="flex justify-between gap-4"><span>Sale total</span><strong>{formatUGX(saleTotal(selectedDocument.sale))}</strong></div><div className="flex justify-between gap-4"><span>Amount paid</span><strong>{formatUGX(salePaid(selectedDocument.sale))}</strong></div><div className="flex justify-between gap-4"><span>Outstanding balance</span><strong>{formatUGX(saleBalance(selectedDocument.sale))}</strong></div>{selectedDocument.kind === "receipt" && Number(selectedDocument.sale.change || 0) > 0 && <div className="flex justify-between gap-4"><span>Change given</span><strong>{formatUGX(Number(selectedDocument.sale.change))}</strong></div>}</div><p className="mt-4 rounded-lg border-l-2 border-sky-500 bg-slate-50 px-3 py-2 text-sm text-slate-700"><b>{selectedDocument.kind === "receipt" ? "Amount received in words:" : "Invoice total in words:"}</b> {amountInWords(selectedDocument.kind === "receipt" ? salePaid(selectedDocument.sale) : saleTotal(selectedDocument.sale))}</p>
               <p className="mt-6 border-t border-slate-200 pt-4 text-xs text-slate-500">Generated from a saved POS transaction. Choose Print / Save PDF to print or download a PDF copy.</p>
             </div>
           </div>

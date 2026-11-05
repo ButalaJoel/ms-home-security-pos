@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { API_BASE, apiFetch } from "../lib/api";
+import { amountInWords } from "../lib/format";
 import { cacheProducts, getCachedProducts } from "../db/offlineService";
 
 // Product records are loaded from MongoDB through the backend API.
@@ -1393,6 +1394,7 @@ const grandTotal = taxableAmount + tax;
               <span>Grand total</span>
               <span>{money(savedSale.grandTotal)}</span>
             </div>
+            <p className="text-xs italic text-slate-600">{amountInWords(savedSale.grandTotal)}</p>
 
             <div className="flex justify-between">
               <span className="text-slate-500">Amount paid</span>
@@ -1409,6 +1411,9 @@ const grandTotal = taxableAmount + tax;
                 <span className="text-slate-500">Change</span>
                 <span>{money(savedSale.change)}</span>
               </div>
+            )}
+            {savedSale.amountPaid > 0 && savedSale.amountPaid !== savedSale.grandTotal && (
+              <p className="text-xs italic text-slate-600">Amount received: {amountInWords(savedSale.amountPaid)}</p>
             )}
           </div>
 

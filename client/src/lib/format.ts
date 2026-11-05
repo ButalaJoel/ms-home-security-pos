@@ -67,3 +67,46 @@ export function whatsappNumber(phone: string | null | undefined): string {
   if (digits.length === 9) return `256${digits}`;
   return digits.length >= 10 ? digits : "";
 }
+
+const ONES = [
+  "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen",
+];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+const SCALES = ["", "Thousand", "Million", "Billion", "Trillion"];
+
+function belowThousand(value: number): string {
+  const hundreds = Math.floor(value / 100);
+  const rest = value % 100;
+  const parts: string[] = [];
+  if (hundreds) parts.push(`${ONES[hundreds]} Hundred`);
+  if (rest) {
+    const words = rest < 20 ? ONES[rest] : `${TENS[Math.floor(rest / 10)]}${rest % 10 ? `-${ONES[rest % 10]}` : ""}`;
+    parts.push(hundreds ? `and ${words}` : words);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Amount in words for documents, e.g. 1,250,000 ->
+ * "Uganda Shillings One Million, Two Hundred and Fifty Thousand Only".
+ */
+export function amountInWords(amount: number | null | undefined): string {
+  let value = Math.round(Math.abs(Number(amount) || 0));
+  if (value === 0) return "Uganda Shillings Zero Only";
+  const groups: string[] = [];
+  let scale = 0;
+  while (value > 0 && scale < SCALES.length) {
+    const chunk = value % 1000;
+    if (chunk) groups.unshift(`${belowThousand(chunk)}${SCALES[scale] ? ` ${SCALES[scale]}` : ""}`);
+    value = Math.floor(value / 1000);
+    scale += 1;
+  }
+  // British style: "One Million and Fifty" when the last group is under 100.
+  const last = Math.round(Math.abs(Number(amount) || 0)) % 1000;
+  let words = groups.join(", ");
+  if (groups.length > 1 && last > 0 && last < 100) {
+    words = `${groups.slice(0, -1).join(", ")} and ${groups[groups.length - 1]}`;
+  }
+  return `Uganda Shillings ${words} Only`;
+}

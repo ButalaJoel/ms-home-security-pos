@@ -4,7 +4,7 @@
  * so both always look identical. Layout copied from the original
  * Invoices & Receipts page designs.
  */
-import { escapeHtml, formatUGX } from "./format";
+import { amountInWords, escapeHtml, formatUGX } from "./format";
 
 export type Settings = Record<string, unknown>;
 
@@ -135,6 +135,7 @@ export function quotationHtml(quote: QuotationForDocument, settings: Settings): 
   .total-row { display: flex; justify-content: space-between; gap: 4mm; padding: 1.3mm 0; }
   .total-row strong { text-align: right; }
   .grand-total { border-top: 1px solid #cbd5e1; margin-top: 1mm; padding-top: 2.5mm; font-size: 12pt; font-weight: 800; }
+  .in-words { margin: -2mm 0 5mm; padding: 2.5mm 3mm; background: #f4f7fb; border-left: 2px solid #00a9e8; font-size: 8.5pt; break-inside: avoid; page-break-inside: avoid; }
   .content-section { margin-top: 4mm; }
   .content-section h2 { font-size: 9pt; margin: 0 0 2mm; }
   .terms p { margin: 0 0 1.5mm; }
@@ -163,6 +164,7 @@ export function quotationHtml(quote: QuotationForDocument, settings: Settings): 
     ${taxHtml}
     <div class="total-row grand-total"><span>Quotation total</span><strong>${escapeHtml(formatUGX(quote.grandTotal))}</strong></div>
   </section>
+  <p class="in-words"><b>Amount in words:</b> ${escapeHtml(amountInWords(quote.grandTotal))}</p>
   ${quote.notes?.trim() ? `<section class="content-section"><h2>Additional notes</h2><div class="terms">${escapeHtml(quote.notes).replace(/\r?\n/g, "<br>")}</div></section>` : ""}
   ${termsHtml ? `<section class="content-section terms"><h2>Terms and conditions</h2>${termsHtml}</section>` : ""}
   ${payments ? `<section class="content-section"><h2>Payment instructions</h2>${payments}</section>` : ""}
@@ -286,6 +288,7 @@ h1{font-size:23px;margin:0}h2{font-size:17px;margin:0}p{margin:2px 0}.muted{colo
 table{width:100%;border-collapse:collapse;margin-top:18px}th{background:#172033;color:white;text-align:left}th,td{padding:10px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}.num{text-align:right;white-space:nowrap}
 tr{break-inside:avoid;page-break-inside:avoid}
 .totals{width:320px;max-width:100%;margin:18px 0 0 auto;break-inside:avoid;page-break-inside:avoid}.row{display:flex;justify-content:space-between;gap:15px;padding:5px 0}.grand{border-top:2px solid #172033;margin-top:5px;padding-top:10px;font-size:16px;font-weight:bold}
+.in-words{margin:14px 0 0;padding:9px 12px;background:#f8fafc;border-left:3px solid #0ea5e9;break-inside:avoid}
 .sub{font-size:13px;margin:22px 0 0}.payments th{background:#475569}.payments th,.payments td{padding:7px 8px;font-size:11px}
 .notice{margin-top:18px;padding:12px;background:#f8fafc;border-left:3px solid #0ea5e9;break-inside:avoid}.payment-method{margin:6px 0}.payment-method h3{font-size:12px;margin:0 0 2px}
 .footer{border-top:1px solid #e2e8f0;margin-top:30px;padding-top:12px;color:#64748b;font-size:10px}
@@ -309,6 +312,9 @@ ${tax ? `<div class="row"><span>${escapeHtml(sale.taxLabel || settingText(settin
 <div class="row"><span>Amount ${isReceipt ? "received" : "paid"}</span><b>${escapeHtml(formatUGX(paid))}</b></div>
 <div class="row"><span>Outstanding balance</span><b>${escapeHtml(formatUGX(balance))}</b></div>
 ${isReceipt && Number(sale.change || 0) > 0 ? `<div class="row"><span>Change given</span><b>${escapeHtml(formatUGX(Number(sale.change)))}</b></div>` : ""}</div>
+${isReceipt
+  ? `<p class="in-words"><b>Amount received in words:</b> ${escapeHtml(amountInWords(paid))}</p>`
+  : `<p class="in-words"><b>Invoice total in words:</b> ${escapeHtml(amountInWords(total))}${balance > 0 && balance !== total ? `<br><b>Balance due in words:</b> ${escapeHtml(amountInWords(balance))}` : ""}</p>`}
 ${paymentRows}
 <div class="notice"><b>${isReceipt ? `Payment status: ${escapeHtml(status)}.` : "Payment terms:"}</b>
 ${isReceipt ? (paid > 0 ? " This receipt records the payments shown above against the sale." : " No payment is recorded as received.") : balance > 0 ? " Please settle the outstanding balance shown above and quote the invoice number when paying." : " This invoice is fully paid. Thank you."}
