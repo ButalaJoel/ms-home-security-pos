@@ -41,13 +41,23 @@ type InventoryProduct = {
 };
 
 
+// "Set exact count" comes first: it is what a stock take needs.
 const adjustmentTypes: AdjustmentType[] = [
+  "Stock correction",
   "Stock received",
   "Stock issued",
   "Damaged stock",
   "Lost stock",
-  "Stock correction",
 ];
+
+// Plain-language labels for the form (the saved type keeps its original name).
+const adjustmentLabels: Record<AdjustmentType, string> = {
+  "Stock correction": "Set exact count (stock take / fix a mistake)",
+  "Stock received": "Add to stock (new stock arrived)",
+  "Stock issued": "Remove from stock (issued or used)",
+  "Damaged stock": "Remove from stock (damaged)",
+  "Lost stock": "Remove from stock (lost or missing)",
+};
 
 const reasonsByType: Record<AdjustmentType, string[]> = {
   "Stock received": [
@@ -164,9 +174,9 @@ function AdjustmentModal({
     reference: string;
   }) => Promise<void>;
 }) {
-  const [type, setType] = useState<AdjustmentType>("Stock received");
+  const [type, setType] = useState<AdjustmentType>("Stock correction");
   const [quantity, setQuantity] = useState("");
-  const [reason, setReason] = useState("Supplier delivery");
+  const [reason, setReason] = useState("Stock count");
   const [reference, setReference] = useState("");
   const [error, setError] = useState("");
 
@@ -286,13 +296,13 @@ function AdjustmentModal({
                 className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 font-normal text-slate-700 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
               >
                 {adjustmentTypes.map((item) => (
-                  <option key={item} value={item}>{item}</option>
+                  <option key={item} value={item}>{adjustmentLabels[item]}</option>
                 ))}
               </select>
             </label>
 
             <label className="block text-sm font-medium text-slate-600">
-              {type === "Stock correction" ? "New stock quantity *" : "Quantity *"}
+              {type === "Stock correction" ? "Exact number in the store now *" : type === "Stock received" ? "How many to add *" : "How many to remove *"}
               <input
                 type="number"
                 min={type === "Stock correction" ? 0 : 1}
@@ -332,6 +342,17 @@ function AdjustmentModal({
               />
             </label>
           </div>
+
+          {quantity !== "" && Number.isInteger(Number(quantity)) && Number(quantity) >= 0 && (() => {
+            const amount = Number(quantity);
+            const next = type === "Stock correction" ? amount : type === "Stock received" ? product.quantity + amount : product.quantity - amount;
+            return (
+              <p className={`mt-4 rounded-lg px-3 py-2 text-sm ${next < 0 ? "bg-rose-50 text-rose-700" : "bg-sky-50 text-sky-800"}`}>
+                Stock will change from <b>{product.quantity}</b> to <b>{next}</b>
+                {type === "Stock correction" ? " (the number you counted)." : type === "Stock received" ? ` (+${amount}).` : ` (−${amount}).`}
+              </p>
+            );
+          })()}
 
           {error && (
             <p role="alert" className="mt-4 text-sm font-medium text-rose-600">

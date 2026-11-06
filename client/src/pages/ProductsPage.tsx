@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ImagePlus,
   Upload,
+  Trash2,
 } from "lucide-react";
 import { API_BASE, apiFetch } from "../lib/api";
 import ProductImportDialog from "../components/ProductImportDialog";
@@ -84,6 +85,26 @@ export default function ProductsPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function deleteProduct(product: Product) {
+    setDeleting(true);
+    try {
+      const response = await apiFetch(`/api/products/${product.id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || "Could not delete the product.");
+      setConfirmDelete(null);
+      setModalOpen(false);
+      setNotice(data.message);
+      void loadProducts();
+    } catch (err) {
+      setConfirmDelete(null);
+      setFormError(err instanceof Error ? err.message : "Could not delete the product.");
+    } finally {
+      setDeleting(false);
+    }
+  }
   const photoPreview = useMemo(() => (photoFile ? URL.createObjectURL(photoFile) : ""), [photoFile]);
   useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
 
@@ -771,7 +792,7 @@ export default function ProductsPage() {
                 )}
 
                 <label className="text-sm font-medium text-slate-700">
-                  Reorder level *
+                  Low-stock alert at (reorder level) *
                   <input
                     required
                     min="0"
@@ -781,6 +802,9 @@ export default function ProductsPage() {
                     onChange={(event) => updateForm("reorderLevel", event.target.value)}
                     className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                   />
+                  <span className="mt-1 block text-xs font-normal text-slate-500">
+                    When stock falls to this number or below, the product is marked "Low stock" and appears in the dashboard alerts so you know to order more. It does not change the stock.
+                  </span>
                 </label>
 
                 {formError && (
@@ -791,6 +815,16 @@ export default function ProductsPage() {
               </div>
 
               <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+                {editingProduct && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => setConfirmDelete(editingProduct)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 sm:mr-auto"
+                  >
+                    <Trash2 size={15} /> Delete product
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={saving}
@@ -810,6 +844,23 @@ export default function ProductsPage() {
               </div>
             </form>
           </section>
+        </div>
+      )}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-label="Delete product">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900">Delete {confirmDelete.name}?</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              If this product was never sold, quoted or received (for example a double entry), it is deleted completely.
+              If it appears in past sales or quotations, it is archived instead: hidden from Products and the till, while old receipts and reports keep showing it.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" disabled={deleting} onClick={() => setConfirmDelete(null)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Keep it</button>
+              <button type="button" disabled={deleting} onClick={() => void deleteProduct(confirmDelete)} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
+                <Trash2 size={15} /> {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {importOpen && (

@@ -29,6 +29,7 @@ const DESCRIPTIONS: { pattern: RegExp; method?: string; area: string; action: st
   { pattern: /^\/api\/products\/[^/]+\/photo$/, method: "DELETE", area: "Products", action: "Removed product photo" },
   { pattern: /^\/api\/products\/[^/]+\/photo$/, area: "Products", action: "Uploaded product photo" },
   { pattern: /^\/api\/products$/, method: "POST", area: "Products", action: "Created product" },
+  { pattern: /^\/api\/products\/[^/]+$/, method: "DELETE", area: "Products", action: "Deleted or archived product" },
   { pattern: /^\/api\/products\//, area: "Products", action: "Edited product" },
   { pattern: /^\/api\/sales\/[^/]+\/payments$/, area: "Payments", action: "Recorded payment" },
   { pattern: /^\/api\/sales$/, method: "POST", area: "Sales", action: "Completed sale" },

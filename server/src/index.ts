@@ -753,6 +753,62 @@ app.post("/api/products", requireAuth,
 // PUT /api/products/:id
 // Updates product details, not quantity.
 // All stock changes must go through the adjustment endpoint.
+// DELETE /api/products/:id
+// A product that was never sold, quoted, received or registered (e.g. a
+// double entry) is deleted completely. One that appears in past records is
+// archived instead (hidden from Products and the till) so old receipts,
+// invoices and reports stay correct.
+app.delete("/api/products/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const productId = getProductId(req.params.id);
+    if (!productId) {
+      res.status(400).json({ success: false, message: "Invalid product ID." });
+      return;
+    }
+    const db = await connectToDatabase();
+    const product = await db.collection<ProductDocument>("products").findOne({ _id: productId });
+    if (!product) {
+      res.status(404).json({ success: false, message: "Product not found." });
+      return;
+    }
+
+    const id = String(productId);
+    const [sales, quotations, receipts, serials] = await Promise.all([
+      db.collection("sales").countDocuments({ "items.productId": { $in: [productId, id] } }),
+      db.collection("quotations").countDocuments({ "items.productId": id }),
+      db.collection("stock_receipts").countDocuments({ "items.productId": id }),
+      db.collection("serials").countDocuments({ productId: id }),
+    ]);
+
+    if (sales + quotations + receipts + serials > 0) {
+      await db.collection<ProductDocument>("products").updateOne(
+        { _id: productId },
+        { $set: { active: false, updatedAt: new Date() } },
+      );
+      res.json({
+        success: true,
+        archived: true,
+        message: `${product.name} is used in past records (${[
+          sales && `${sales} sale(s)`,
+          quotations && `${quotations} quotation(s)`,
+          receipts && `${receipts} delivery(ies)`,
+          serials && `${serials} serial number(s)`,
+        ].filter(Boolean).join(", ")}), so it was archived: hidden from Products and the till, with its history kept.`,
+      });
+      return;
+    }
+
+    await db.collection("products").deleteOne({ _id: productId });
+    await db.collection("stock_adjustments").deleteMany({ productId });
+    const publicId = (product as ProductDocument & { imagePublicId?: string }).imagePublicId;
+    if (publicId) cloudinary.uploader.destroy(publicId).catch(() => undefined);
+    res.json({ success: true, archived: false, message: `${product.name} was deleted.` });
+  } catch (error) {
+    console.error("Delete product error:", error);
+    res.status(500).json({ success: false, message: "Could not delete the product." });
+  }
+});
+
 app.put("/api/products/:id", requireAuth,
   async (req: Request, res: Response) => {
   try {
