@@ -123,7 +123,7 @@ export function quotationHtml(quote: QuotationForDocument, settings: Settings): 
   .customer p { margin: 1mm 0; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 4mm; }
   thead { display: table-header-group; }
-  th { background: #1e293b; color: white; text-align: left; font-size: 8pt; font-weight: 700; }
+  th { background: #00a9e8; color: #ffffff; text-align: left; font-size: 8pt; font-weight: 700; }
   th, td { padding: 2mm 1.5mm; vertical-align: top; overflow-wrap: anywhere; }
   th:first-child, td:first-child { width: 46%; }
   th:nth-child(2), td:nth-child(2) { width: 10%; }
