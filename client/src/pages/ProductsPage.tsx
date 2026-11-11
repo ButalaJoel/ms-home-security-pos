@@ -16,6 +16,12 @@ import {
 } from "lucide-react";
 import { API_BASE, apiFetch } from "../lib/api";
 import ProductImportDialog from "../components/ProductImportDialog";
+import ProductWebsiteFields, {
+  emptyWebsiteForm,
+  websiteFormFrom,
+  websitePayload,
+  type WebsiteForm,
+} from "../components/ProductWebsiteFields";
 
 // Keep the API URL configurable for development and deployment.
 const API_URL = (
@@ -34,6 +40,8 @@ type Product = {
   reorderLevel: number;
   active: boolean;
   imageUrl: string;
+  website: WebsiteForm;
+  gallery: string[];
 };
 
 type ProductForm = {
@@ -84,6 +92,8 @@ export default function ProductsPage() {
   const [formError, setFormError] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
+  const [web, setWeb] = useState<WebsiteForm>(emptyWebsiteForm);
+  const [gallery, setGallery] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -135,13 +145,17 @@ export default function ProductsPage() {
           reorderLevel: Number(item.reorderLevel ?? 5),
           active: item.active !== false,
           imageUrl: typeof item.imageUrl === "string" ? item.imageUrl : "",
+          website: websiteFormFrom(item),
+          gallery: Array.isArray(item.gallery)
+            ? item.gallery.map((photo) => String((photo as { url?: unknown })?.url ?? "")).filter(Boolean)
+            : [],
         })
       );
 
       setProducts(mappedProducts);
     } catch (err) {
       setError(
-        `${getErrorMessage(err)} Check that the backend is running at ${API_URL}.`
+        `${getErrorMessage(err)} Check the internet connection, then press Try again.`
       );
     } finally {
       setLoading(false);
@@ -210,6 +224,8 @@ export default function ProductsPage() {
     setRemovePhoto(false);
     setEditingProduct(null);
     setForm(emptyForm);
+    setWeb(emptyWebsiteForm);
+    setGallery([]);
     setFormError("");
     setNotice("");
     setModalOpen(true);
@@ -219,6 +235,8 @@ export default function ProductsPage() {
     setPhotoFile(null);
     setRemovePhoto(false);
     setEditingProduct(product);
+    setWeb(product.website);
+    setGallery(product.gallery);
     setForm({
       name: product.name,
       sku: product.sku,
@@ -278,6 +296,7 @@ export default function ProductsPage() {
       sellingPrice,
       reorderLevel,
       ...(editingProduct ? {} : { quantity }),
+      ...websitePayload(web),
     };
 
     setSaving(true);
@@ -806,6 +825,18 @@ export default function ProductsPage() {
                     When stock falls to this number or below, the product is marked "Low stock" and appears in the dashboard alerts so you know to order more. It does not change the stock.
                   </span>
                 </label>
+
+                <ProductWebsiteFields
+                  value={web}
+                  onChange={setWeb}
+                  category={form.category}
+                  productId={editingProduct?.id}
+                  gallery={gallery}
+                  onGalleryChange={(urls) => {
+                    setGallery(urls);
+                    void loadProducts();
+                  }}
+                />
 
                 {formError && (
                   <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2">

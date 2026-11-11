@@ -48,6 +48,14 @@ import supplierRoutes from "./features/suppliers.js";
 import expenseRoutes from "./features/expenses.js";
 import productPhotoRoutes from "./features/productPhotos.js";
 import productImportRoutes from "./features/productImport.js";
+import publicRoutes from "./features/public.js";
+import productWebsiteRoutes, {
+  hasWebsiteFields,
+  parseWebsiteFields,
+  WEBSITE_DEFAULTS,
+  type GalleryPhoto,
+  type ProductSpec,
+} from "./features/productWebsite.js";
 import backupRoutes from "./features/backup.js";
 const app = express();
 app.set('trust proxy', 1);
@@ -66,6 +74,8 @@ const allowedOrigins = [
   // that the server also serves the app itself.
   process.env.RENDER_EXTERNAL_URL,
   process.env.APP_URL,
+  // The public website (e.g. https://mshomesecurity.co.ug), for its read-only /api/public calls.
+  process.env.WEBSITE_URL,
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:5175",
@@ -85,11 +95,16 @@ app.use(
           origin || "",
         );
 
+      // The website's Vercel review links (ms-home-security-website…vercel.app).
+      const isWebsitePreviewOrigin =
+        /^https:\/\/ms-home-security-website[a-z0-9-]*\.vercel\.app$/.test(origin || "");
+
       if (
         !origin ||
         allowedOrigins.includes(origin) ||
         isLocalDevelopmentOrigin ||
-        isVercelPreviewOrigin
+        isVercelPreviewOrigin ||
+        isWebsitePreviewOrigin
       ) {
         callback(null, true);
         return;
@@ -206,6 +221,17 @@ type ProductDocument = {
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
+  // Website details (optional; see features/productWebsite.ts).
+  imageUrl?: string;
+  model?: string;
+  subcategory?: string;
+  series?: string;
+  description?: string;
+  features?: string[];
+  specs?: ProductSpec[];
+  gallery?: GalleryPhoto[];
+  showOnWebsite?: boolean;
+  featured?: boolean;
 };
 
 type AdjustmentDocument = {
@@ -267,6 +293,16 @@ const defaultSettings = {
   warrantyDuration: "6 months",
   termsAndConditions: "",
   logoUrl: "",
+  // Website (shown on the public site; see features/public.ts)
+  whatsappNumber: "",
+  openingHours: "",
+  mapLink: "",
+  facebookUrl: "",
+  instagramUrl: "",
+  tiktokUrl: "",
+  installationTerms: "",
+  orderAlertEmail: "",
+  orderAlertWhatsapp: "",
 };
 
 type BusinessSettingsDocument = Document & {
@@ -640,6 +676,12 @@ app.post("/api/products", requireAuth,
       return;
     }
 
+    const website = parseWebsiteFields(req.body);
+    if (!website.ok) {
+      res.status(400).json({ success: false, message: website.message });
+      return;
+    }
+
     if (
       !isNonNegativeNumber(costPrice) ||
       !isNonNegativeNumber(sellingPrice) ||
@@ -691,6 +733,8 @@ app.post("/api/products", requireAuth,
       quantity,
       reorderLevel,
       active: true,
+      ...WEBSITE_DEFAULTS,
+      ...website.fields,
       createdAt: now,
       updatedAt: now,
     };
@@ -841,7 +885,13 @@ app.put("/api/products/:id", requireAuth,
       }
     }
 
-    if (Object.keys(updates).length === 0) {
+    const website = parseWebsiteFields(req.body);
+    if (!website.ok) {
+      res.status(400).json({ success: false, message: website.message });
+      return;
+    }
+
+    if (Object.keys(updates).length === 0 && !hasWebsiteFields(req.body)) {
       res.status(400).json({
         success: false,
         message: "No supported product fields were provided.",
@@ -938,7 +988,7 @@ app.put("/api/products/:id", requireAuth,
 
     const result = await products.findOneAndUpdate(
       { _id: productId },
-      { $set: { ...updates, updatedAt: new Date() } },
+      { $set: { ...updates, ...website.fields, updatedAt: new Date() } },
       { returnDocument: "after" }
     );
 
@@ -2198,7 +2248,9 @@ customerType,
 // ---------------------------------------------------------
 
 app.use(productImportRoutes); // POST /api/products/import
+app.use(publicRoutes); // /api/public/* for the website (no login, safe fields only)
 app.use(productPhotoRoutes); // /api/products/:id/photo
+app.use(productWebsiteRoutes); // /api/products/:id/gallery (extra website photos)
 app.use(paymentRoutes); // /api/sales/:id/payments, /api/balances
 app.use("/api/quotations", quotationRoutes);
 app.use("/api/jobs", jobRoutes);

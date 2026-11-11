@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, SESSION_EXPIRED_EVENT } from "../lib/api";
 
 export interface AuthUser {
   id: string;
@@ -97,6 +97,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshUser();
   }, [refreshUser]);
+
+  // Any request answered "not signed in" ends the session on this device too.
+  useEffect(() => {
+    function handleExpired() {
+      writeCachedUser(null);
+      try {
+        sessionStorage.setItem("ms-pos-session-expired", "1");
+      } catch {
+        // Ignore: the notice on the sign-in page is optional.
+      }
+      setUser(null);
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpired);
+  }, []);
 
   const login = useCallback(
     async (email: string, password: string) => {

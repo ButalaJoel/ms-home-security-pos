@@ -16,12 +16,20 @@ export function apiUrl(path: string): string {
   return `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-export function apiFetch(
+export const SESSION_EXPIRED_EVENT = "ms-pos:session-expired";
+
+export async function apiFetch(
   path: string,
   options: RequestInit = {},
 ): Promise<Response> {
-  return fetch(apiUrl(path), {
+  const response = await fetch(apiUrl(path), {
     ...options,
     credentials: "include",
   });
+  // The server no longer recognises this login (it expired or was signed out
+  // elsewhere): tell the app so it shows the sign-in page instead of errors.
+  if (response.status === 401 && !path.startsWith("/api/auth/login")) {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
+  return response;
 }

@@ -9,7 +9,18 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  // Shown when the app was sent here because the login had expired.
+  const [error, setError] = useState(() => {
+    try {
+      if (sessionStorage.getItem("ms-pos-session-expired")) {
+        sessionStorage.removeItem("ms-pos-session-expired");
+        return "Your login expired. Please sign in again.";
+      }
+    } catch {
+      // Ignore storage errors.
+    }
+    return "";
+  });
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

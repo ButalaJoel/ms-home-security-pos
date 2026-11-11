@@ -18,6 +18,7 @@ import {
   LoaderCircle,
   CreditCard,
   ShieldCheck,
+  MonitorSmartphone,
 } from "lucide-react";
 import { API_BASE, apiFetch } from "../lib/api";
 import UsersPage from "./UsersPage";
@@ -27,6 +28,7 @@ import { useAuth } from "../context/AuthContext";
 
 type SettingSection =
   | "business"
+  | "website"
   | "regional"
   | "documents"
   | "payments"
@@ -73,6 +75,16 @@ const initialSettings = {
     "4. Products carry a 6-month warranty, subject to applicable terms and exclusions.\n" +
     "5. Quotations are valid for 30 days unless otherwise stated.",
   logoUrl: "",
+  // Shown on the public website (read through /api/public/business).
+  whatsappNumber: "",
+  openingHours: "",
+  mapLink: "",
+  facebookUrl: "",
+  instagramUrl: "",
+  tiktokUrl: "",
+  installationTerms: "Installation jobs need a 70% deposit, with the 30% balance paid on handover.",
+  orderAlertEmail: "",
+  orderAlertWhatsapp: "",
 };
 
 type BusinessSettings = typeof initialSettings;
@@ -83,6 +95,7 @@ const sections: {
   icon: typeof Building2;
 }[] = [
   { id: "business", label: "Business profile", icon: Building2 },
+  { id: "website", label: "Website", icon: MonitorSmartphone },
   { id: "regional", label: "Regional preferences", icon: Globe },
   { id: "documents", label: "Invoices & terms", icon: FileText },
   { id: "payments", label: "Payment accounts", icon: CreditCard },
@@ -542,6 +555,45 @@ const loaded: BusinessSettings = {
               "termsAndConditions",
               8,
             )}
+          </>
+        );
+
+      case "website":
+        return (
+          <>
+            {sectionHeading(
+              "Website",
+              "Details shown on the public website. Phone numbers, email, address, MoMo numbers and warranty come from the other sections.",
+            )}
+
+            <div className="grid grid-cols-1 gap-5 py-5 sm:grid-cols-2">
+              {renderField("WhatsApp number for customers", "whatsappNumber", "tel", "+256 7XX XXX XXX (leave empty to use the first phone)")}
+              {renderField("Opening hours", "openingHours", "text", "e.g. Mon to Sat, 8:00am to 6:00pm")}
+              <div className="sm:col-span-2">
+                {renderField("Google Maps link to the shop", "mapLink", "url", "Paste the Share link from Google Maps")}
+              </div>
+              <div className="sm:col-span-2">
+                {renderTextarea("Installation terms (shown on the website)", "installationTerms", 2)}
+              </div>
+            </div>
+
+            <div className="border-t border-[#dce5f0] py-5">
+              <h3 className="mb-4 text-sm font-semibold text-[#10213b]">Social media</h3>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                {renderField("Facebook page", "facebookUrl", "url", "https://facebook.com/…")}
+                {renderField("Instagram", "instagramUrl", "url", "https://instagram.com/…")}
+                {renderField("TikTok", "tiktokUrl", "url", "https://tiktok.com/@…")}
+              </div>
+            </div>
+
+            <div className="border-t border-[#dce5f0] py-5">
+              <h3 className="mb-1 text-sm font-semibold text-[#10213b]">Alerts for website orders and requests</h3>
+              <p className="mb-4 text-xs text-[#7a8eaa]">Who should be told when a customer orders or sends a request from the website. These are never shown on the website.</p>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                {renderField("Alert email", "orderAlertEmail", "email", "sales@…")}
+                {renderField("Alert WhatsApp number", "orderAlertWhatsapp", "tel", "+256 7XX XXX XXX")}
+              </div>
+            </div>
           </>
         );
 
