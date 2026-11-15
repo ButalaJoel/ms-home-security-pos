@@ -2365,6 +2365,14 @@ async function startServer() {
     configureAuthDatabase(db);
   configureUserRoutesDatabase(db);
 
+    // One-off tidy-up (safe to run every start): fire extinguishers and batons were
+    // first entered under Metal Detectors; they belong in Safety & Guard Equipment.
+    const moved = await db.collection("products").updateMany(
+      { category: "Metal Detectors", subcategory: { $in: ["Fire extinguishers", "Guard equipment"] } },
+      { $set: { category: "Safety & Guard Equipment", updatedAt: new Date() } },
+    );
+    if (moved.modifiedCount > 0) console.log(`Moved ${moved.modifiedCount} product(s) to Safety & Guard Equipment.`);
+
     app.listen(port, () => {
       console.log(`MS Home Security API running on http://localhost:${port}`);
     });
