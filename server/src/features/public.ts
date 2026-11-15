@@ -43,7 +43,9 @@ export function toPublicProduct(product: Document) {
     sku: text(product.sku),
     category: text(product.category),
     brand: text(product.brand),
-    price: Number(product.sellingPrice ?? 0),
+    // Prices are not published: resellers and end customers would see conflicting prices.
+    // 0 makes the website show "Price on request"; staff quote the price when they call.
+    price: 0,
     imageUrl: text(product.imageUrl),
     stock: stockStatus(product),
     model: text(product.model),
