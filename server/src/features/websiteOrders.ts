@@ -18,7 +18,7 @@
  * at the time of ordering, for staff only.
  */
 import { Router, type Request, type Response } from "express";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { layeredLimit } from "../rateLimits.js";
 import type { Document } from "mongodb";
 import { connectToDatabase } from "../db.js";
 import { requireAuth } from "../authMiddleware.js";
@@ -52,33 +52,19 @@ function formatPhone(normalised: string): string {
   return `+${normalised.slice(0, 3)} ${normalised.slice(3, 6)} ${normalised.slice(6, 9)} ${normalised.slice(9)}`;
 }
 
-/**
- * Website visitors reach this server through the website's own address (a proxy),
- * so req.ip is the proxy for everyone. The customer's own address is the first
- * entry of X-Forwarded-For; limit per customer, not per proxy.
- */
-function customerKey(req: Request): string {
-  const forwarded = String(req.headers["x-forwarded-for"] ?? "").split(",")[0]?.trim();
-  return ipKeyGenerator(forwarded || req.ip || "unknown");
-}
-
 // A real customer places one or two orders; this stops scripts filling the inbox.
-const placeLimiter = rateLimit({
+const placeLimiter = layeredLimit({
   windowMs: 10 * 60 * 1000,
-  limit: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: customerKey,
-  message: { success: false, message: "Too many orders from this connection. Please wait a few minutes or WhatsApp us." },
+  perVisitor: 5,
+  perConnection: 60,
+  message: "Too many orders from this connection. Please wait a few minutes or WhatsApp us.",
 });
 
-const trackLimiter = rateLimit({
+const trackLimiter = layeredLimit({
   windowMs: 10 * 60 * 1000,
-  limit: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: customerKey,
-  message: { success: false, message: "Too many tries. Please wait a few minutes and try again." },
+  perVisitor: 30,
+  perConnection: 600,
+  message: "Too many tries. Please wait a few minutes and try again.",
 });
 
 const router = Router();

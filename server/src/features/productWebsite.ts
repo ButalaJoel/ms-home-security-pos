@@ -124,7 +124,11 @@ export function cleanImageUrl(value: unknown): string {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
-    if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(parsed.hostname)) return "";
+    if (parsed.username || parsed.password) return "";
+    const host = parsed.hostname.toLowerCase();
+    // Real photo links use a public web address: no raw IP addresses, no local or internal names.
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith("[") || !host.includes(".")) return "";
+    if (/(^|\.)(localhost|local|internal|lan|home|corp)$/.test(host)) return "";
     return parsed.toString();
   } catch {
     return "";

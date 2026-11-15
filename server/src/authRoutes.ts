@@ -1,7 +1,7 @@
 
 import { Router, type Request, type Response } from "express";
 import type { Db } from "mongodb";
-import rateLimit from "express-rate-limit";
+import { layeredLimit, perAccountLoginLimit } from "./rateLimits.js";
 import {
   findActiveUserById,
   hashPassword,
@@ -14,16 +14,17 @@ import {
 
 const router = Router();
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
+// Failed logins only count against the person trying (and the account), so one
+// person's mistakes never lock out the rest of the staff behind the same proxy.
+const loginLimiter = [
+  ...layeredLimit({
+    windowMs: 15 * 60 * 1000,
+    perVisitor: 20,
+    perConnection: 200,
     message: "Too many attempts. Please try again later.",
-  },
-});
+  }),
+  perAccountLoginLimit,
+];
 
 let authDatabase: Db | null = null;
 

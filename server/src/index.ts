@@ -2318,6 +2318,17 @@ app.use(
       return;
     }
 
+    // Broken or oversized JSON from a client is the client's mistake, not a server fault.
+    const bodyError = (error as { type?: string }).type;
+    if (bodyError === "entity.parse.failed") {
+      res.status(400).json({ success: false, message: "The request could not be read." });
+      return;
+    }
+    if (bodyError === "entity.too.large") {
+      res.status(413).json({ success: false, message: "The request is too large." });
+      return;
+    }
+
     if (error instanceof multer.MulterError) {
       res.status(400).json({
         success: false,

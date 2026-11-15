@@ -8,22 +8,19 @@
  * Later steps add POST endpoints here for orders and website requests.
  */
 import { Router, type Request, type Response } from "express";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { layeredLimit } from "../rateLimits.js";
 import type { Document } from "mongodb";
 import { connectToDatabase } from "../db.js";
 import { handleFailure } from "./common.js";
 
 const router = Router();
 
-// Generous for browsing, but stops anyone hammering the server. Counted per visitor:
-// the website proxies these calls, so the visitor is the first X-Forwarded-For address.
-const readLimiter = rateLimit({
+// Generous for browsing, but stops anyone hammering the server.
+const readLimiter = layeredLimit({
   windowMs: 60 * 1000,
-  limit: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => ipKeyGenerator(String(req.headers["x-forwarded-for"] ?? "").split(",")[0]?.trim() || req.ip || "unknown"),
-  message: { success: false, message: "Too many requests. Please wait a minute and try again." },
+  perVisitor: 120,
+  perConnection: 2000,
+  message: "Too many requests. Please wait a minute and try again.",
 });
 
 type StockStatus = "in_stock" | "low_stock" | "available_to_order";
