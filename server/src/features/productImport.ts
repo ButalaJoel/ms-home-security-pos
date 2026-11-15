@@ -52,11 +52,12 @@ router.post("/api/products/import", requireAuth, async (req: Request, res: Respo
 
     const db = await connectToDatabase();
     const products = db.collection("products");
-    const current = await products.find({}, { projection: { sku: 1, name: 1 } }).toArray();
+    const current = await products.find({}, { projection: { sku: 1, name: 1, brand: 1 } }).toArray();
     const existingSkus = new Set(current.map((product) => String(product.sku).toUpperCase()));
     const existingNames = new Set(current.map((product) => String(product.name).toLowerCase()));
     const idBySku = new Map(current.map((product) => [String(product.sku).toUpperCase(), product._id]));
     const idByName = new Map(current.map((product) => [String(product.name).toLowerCase(), product._id]));
+    const blankBrand = new Set(current.filter((product) => !String(product.brand ?? "").trim()).map((product) => String(product._id)));
     const updates: { id: unknown; name: string; fields: Record<string, unknown> }[] = [];
     const photoJobs: { id: unknown; url: string }[] = [];
     const newPhotoUrls: string[] = []; // same order as documents
@@ -83,6 +84,9 @@ router.post("/api/products/import", requireAuth, async (req: Request, res: Respo
       const existingId = (rowSku && idBySku.get(rowSku)) || idByName.get(name.toLowerCase());
       if (updateExisting && existingId) {
         const fields = websiteColumns(row);
+        // A brand is filled in only where the product has none; a brand staff typed is never replaced.
+        const brand = cleanText(row.brand, 100);
+        if (brand && blankBrand.has(String(existingId))) fields.brand = brand;
         const photoUrl = cleanImageUrl(row.imageUrl);
         if (photoUrl) photoJobs.push({ id: existingId, url: photoUrl });
         if (Object.keys(fields).length === 0) return void (photoUrl ? undefined : skipped.push(name));
