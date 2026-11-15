@@ -59,6 +59,10 @@ export const PRODUCT_TYPES: Record<string, ProductType[]> = {
     { name: "Parking systems", specs: ["Entry method", "Payment", "Number-plate recognition", "Display", "Software"] },
     { name: "Queue management", specs: ["Ticket printing", "Counters supported", "Display", "Voice calling", "Software"] },
   ],
+  "Safety & Guard Equipment": [
+    { name: "Fire extinguishers", specs: ["Agent", "Capacity", "Fire classes", "Discharge time", "Throw range", "Refillable"] },
+    { name: "Guard equipment", specs: ["Type", "Material", "Length", "Weight"] },
+  ],
 };
 
 export function typesFor(category: string): ProductType[] {
