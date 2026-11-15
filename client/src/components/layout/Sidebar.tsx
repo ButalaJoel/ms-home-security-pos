@@ -1,11 +1,32 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LogOut, X } from "lucide-react";
 
 import { navigationItems } from "../../data/navigation";
 import { useConnectionStatus } from "../../hooks/useConnectionStatus";
 import { useAuth } from "../../context/AuthContext";
+import { apiJson } from "../../lib/http";
+
+/** Number of new website orders, checked every minute and after staff change one. */
+function useNewWebsiteOrders(enabled: boolean): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    let stopped = false;
+    const check = () => {
+      if (!navigator.onLine) return;
+      apiJson<{ received: number }>("/api/website-orders/summary")
+        .then((data) => { if (!stopped) setCount(data.received); })
+        .catch(() => undefined); // older server or offline: no badge
+    };
+    check();
+    const timer = setInterval(check, 60_000);
+    window.addEventListener("ms-pos:website-orders-changed", check);
+    return () => { stopped = true; clearInterval(timer); window.removeEventListener("ms-pos:website-orders-changed", check); };
+  }, [enabled]);
+  return count;
+}
 
 // Props passed from App.tsx to control the mobile sidebar.
 type SidebarProps = {
@@ -21,6 +42,7 @@ export default function Sidebar({
   const navigate = useNavigate();
 
   const { user, logout } = useAuth();
+  const newOrders = useNewWebsiteOrders(!!user);
 
   const [collapsed, setCollapsed] = useState(false);
   const [signOutError, setSignOutError] = useState("");
@@ -182,6 +204,14 @@ export default function Sidebar({
                 <span className={collapsed ? "md:hidden" : ""}>
                   {item.label}
                 </span>
+                {item.path === "/online-orders" && newOrders > 0 && (
+                  <span
+                    aria-label={`${newOrders} new`}
+                    className={`ml-auto rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-bold text-slate-900 ${collapsed ? "md:absolute md:right-1 md:top-1 md:ml-0 md:px-1.5" : ""}`}
+                  >
+                    {newOrders}
+                  </span>
+                )}
               </button>
               </div>
             );

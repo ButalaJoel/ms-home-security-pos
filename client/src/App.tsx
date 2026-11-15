@@ -31,6 +31,7 @@ import WarrantiesPage from "./pages/WarrantiesPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import ExpensesPage from "./pages/ExpensesPage";
 import ActivityPage from "./pages/ActivityPage";
+import OnlineOrdersPage from "./pages/OnlineOrdersPage";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { syncPendingSales } from "./db/syncService";
@@ -188,6 +189,7 @@ function AppLayout() {
             <Route path="/suppliers" element={<SuppliersPage />} />
             <Route path="/expenses" element={<ExpensesPage />} />
             <Route path="/activity" element={<ActivityPage />} />
+            <Route path="/online-orders" element={<OnlineOrdersPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

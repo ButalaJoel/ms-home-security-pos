@@ -49,6 +49,7 @@ import expenseRoutes from "./features/expenses.js";
 import productPhotoRoutes from "./features/productPhotos.js";
 import productImportRoutes from "./features/productImport.js";
 import publicRoutes from "./features/public.js";
+import websiteOrderRoutes from "./features/websiteOrders.js";
 import productWebsiteRoutes, {
   hasWebsiteFields,
   parseWebsiteFields,
@@ -2249,6 +2250,7 @@ customerType,
 
 app.use(productImportRoutes); // POST /api/products/import
 app.use(publicRoutes); // /api/public/* for the website (no login, safe fields only)
+app.use(websiteOrderRoutes); // /api/public/orders (website) and /api/website-orders (staff)
 app.use(productPhotoRoutes); // /api/products/:id/photo
 app.use(productWebsiteRoutes); // /api/products/:id/gallery (extra website photos)
 app.use(paymentRoutes); // /api/sales/:id/payments, /api/balances
@@ -2359,6 +2361,8 @@ async function startServer() {
       db.collection("expenses").createIndex({ date: -1 }),
       db.collection("cashups").createIndex({ date: 1 }, { unique: true }),
       db.collection("activity_log").createIndex({ createdAt: -1 }),
+      db.collection("website_orders").createIndex({ number: 1 }, { unique: true }),
+      db.collection("website_orders").createIndex({ status: 1, createdAt: -1 }),
       db.collection("sales").createIndex({ "payments.receivedAt": 1 }),
     ]);
 

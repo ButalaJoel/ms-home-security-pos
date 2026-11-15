@@ -5,6 +5,7 @@ import {
   Clock,
   FileSignature,
   FileText,
+  Globe,
   LayoutDashboard,
   Package,
   Settings,
@@ -21,6 +22,7 @@ import {
 export const navigationItems = [
   { label: "Dashboard", path: "/", icon: LayoutDashboard, section: "Overview" },
   { label: "Point of Sale", path: "/pos", icon: ShoppingCart, section: "Sell" },
+  { label: "Online orders", path: "/online-orders", icon: Globe },
   { label: "Quotations", path: "/quotations", icon: FileSignature },
   { label: "Sales History", path: "/sales", icon: Clock },
   { label: "Invoices & Receipts", path: "/documents", icon: FileText },
