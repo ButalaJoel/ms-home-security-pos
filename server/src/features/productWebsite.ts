@@ -116,6 +116,62 @@ export function splitSpecs(value: unknown): ProductSpec[] {
     .slice(0, MAX_SPECS);
 }
 
+// ---- Photos from a link (used by the import) ----
+
+/** Accepts only plain https links to an image file or image service; nothing local or private. */
+export function cleanImageUrl(value: unknown): string {
+  const url = cleanText(value, 1000);
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
+    if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(parsed.hostname)) return "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Copies a photo from a public link into our Cloudinary, so the website never
+ * depends on another site keeping its picture. Returns null if it fails.
+ */
+export async function copyPhotoFromUrl(url: string): Promise<GalleryPhoto | null> {
+  if (!url || !cloudinaryReady()) return null;
+  try {
+    const result = await cloudinary.uploader.upload(url, {
+      folder: "ms-home-security-pos/products",
+      resource_type: "image",
+      transformation: [{ width: 1200, height: 1200, crop: "limit", quality: "auto", fetch_format: "auto" }],
+    });
+    return { url: result.secure_url, publicId: result.public_id };
+  } catch (error) {
+    console.error("Photo copy failed", url, error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+/**
+ * Gives each product its main photo from a link, one after another, in the background.
+ * A product that already has a main photo keeps it.
+ */
+export function copyMainPhotosInBackground(jobs: { id: unknown; url: string }[]): void {
+  if (jobs.length === 0) return;
+  void (async () => {
+    const db = await connectToDatabase();
+    const products = db.collection("products");
+    let added = 0;
+    for (const job of jobs) {
+      const product = await products.findOne({ _id: job.id as never }, { projection: { imageUrl: 1 } });
+      if (!product || (typeof product.imageUrl === "string" && product.imageUrl)) continue;
+      const photo = await copyPhotoFromUrl(job.url);
+      if (!photo) continue;
+      await products.updateOne({ _id: job.id as never }, { $set: { imageUrl: photo.url, imagePublicId: photo.publicId, updatedAt: new Date() } });
+      added += 1;
+    }
+    console.log(`Import photos: ${added} of ${jobs.length} added.`);
+  })().catch((error) => console.error("Import photos stopped", error));
+}
+
 // ---- Extra photos (gallery) ----
 
 const upload = multer({

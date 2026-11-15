@@ -5,7 +5,9 @@
  * Missing SKUs are generated from the category (e.g. CAM-0001).
  *
  * Optional website columns: model, subcategory (type), series, description,
- * features ("a | b | c") and specs ("Label: value | Label: value").
+ * features ("a | b | c") and specs ("Label: value | Label: value"), and
+ * imageUrl: a link to the maker's photo, copied into Cloudinary in the
+ * background for products that have no main photo yet.
  * With updateExisting = true, rows that match an existing product (by SKU,
  * else by name) only update that product's website details; prices, stock
  * and till fields are never changed by an update.
@@ -14,7 +16,7 @@ import { Router, type Request, type Response } from "express";
 import { connectToDatabase } from "../db.js";
 import { requireAuth } from "../authMiddleware.js";
 import { cleanText, handleFailure, isMoney, sendError } from "./common.js";
-import { splitList, splitSpecs, WEBSITE_DEFAULTS } from "./productWebsite.js";
+import { cleanImageUrl, copyMainPhotosInBackground, splitList, splitSpecs, WEBSITE_DEFAULTS } from "./productWebsite.js";
 
 /** Website columns from one pasted row; only columns that have something in them. */
 function websiteColumns(row: Record<string, unknown>): Record<string, unknown> {
@@ -56,6 +58,8 @@ router.post("/api/products/import", requireAuth, async (req: Request, res: Respo
     const idBySku = new Map(current.map((product) => [String(product.sku).toUpperCase(), product._id]));
     const idByName = new Map(current.map((product) => [String(product.name).toLowerCase(), product._id]));
     const updates: { id: unknown; name: string; fields: Record<string, unknown> }[] = [];
+    const photoJobs: { id: unknown; url: string }[] = [];
+    const newPhotoUrls: string[] = []; // same order as documents
 
     const errors: string[] = [];
     const skipped: string[] = [];
@@ -79,7 +83,9 @@ router.post("/api/products/import", requireAuth, async (req: Request, res: Respo
       const existingId = (rowSku && idBySku.get(rowSku)) || idByName.get(name.toLowerCase());
       if (updateExisting && existingId) {
         const fields = websiteColumns(row);
-        if (Object.keys(fields).length === 0) return void skipped.push(name);
+        const photoUrl = cleanImageUrl(row.imageUrl);
+        if (photoUrl) photoJobs.push({ id: existingId, url: photoUrl });
+        if (Object.keys(fields).length === 0) return void (photoUrl ? undefined : skipped.push(name));
         return void updates.push({ id: existingId, name, fields });
       }
 
@@ -101,6 +107,7 @@ router.post("/api/products/import", requireAuth, async (req: Request, res: Respo
 
       existingSkus.add(sku);
       existingNames.add(name.toLowerCase());
+      newPhotoUrls.push(cleanImageUrl(row.imageUrl));
       documents.push({
         name,
         sku,
@@ -122,7 +129,12 @@ router.post("/api/products/import", requireAuth, async (req: Request, res: Respo
     if (errors.length > 0) {
       return res.status(400).json({ success: false, message: `Nothing was imported. Fix ${errors.length} row(s) first.`, errors, skipped });
     }
-    if (documents.length > 0) await products.insertMany(documents);
+    if (documents.length > 0) {
+      const inserted = await products.insertMany(documents);
+      newPhotoUrls.forEach((url, index) => {
+        if (url && inserted.insertedIds[index]) photoJobs.push({ id: inserted.insertedIds[index], url });
+      });
+    }
     for (const update of updates) {
       await products.updateOne({ _id: update.id as never }, { $set: { ...update.fields, updatedAt: now } });
     }
@@ -130,7 +142,9 @@ router.post("/api/products/import", requireAuth, async (req: Request, res: Respo
       documents.length ? `${documents.length} new product(s) imported with zero stock.` : "",
       updates.length ? `${updates.length} existing product(s) updated with website details.` : "",
       skipped.length ? `${skipped.length} skipped (${updateExisting ? "nothing to update" : "already exist"}).` : "",
+      photoJobs.length ? `${photoJobs.length} photo(s) are being copied in the background; refresh in a minute.` : "",
     ].filter(Boolean);
+    copyMainPhotosInBackground(photoJobs);
     res.status(201).json({
       success: true,
       message: parts.join(" ") || "Nothing to import.",
