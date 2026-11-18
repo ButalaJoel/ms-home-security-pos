@@ -297,7 +297,7 @@ export default function DashboardPage() {
       </section>
 
       <footer className="flex flex-wrap items-center justify-between gap-2 pb-2 text-xs text-slate-400">
-        <span>MS Home Security Solutions · POS</span>
+        <span>MS Security Systems Ltd · POS</span>
         <span className="inline-flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${error ? "bg-red-500" : loading ? "bg-amber-500" : "bg-emerald-500"}`} />{error ? "API connection issue" : loading ? "Refreshing data" : "Connected to API"}</span>
       </footer>
     </div>

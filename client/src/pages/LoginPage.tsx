@@ -49,8 +49,8 @@ export default function LoginPage() {
           <div>
             <div className="flex w-fit items-center">
   <img
-    src="/ms-home-security-logo.png"
-    alt="MS Home Security Solutions"
+    src="/ms-security-systems-logo.png"
+    alt="MS Security Systems Ltd"
     className="h-20 w-56 object-contain object-left"
   />
 </div>
@@ -86,8 +86,8 @@ export default function LoginPage() {
             {/* Mobile branding */}
             <div className="mb-8 inline-flex max-w-full rounded-xl bg-white p-2 shadow-sm ring-1 ring-slate-100 md:hidden">
               <img
-                src="/ms-home-security-logo.png"
-                alt="MS Home Security Solutions"
+                src="/ms-security-systems-logo.png"
+                alt="MS Security Systems Ltd"
                 className="h-12 w-40 object-contain"
               />
             </div>
@@ -180,7 +180,7 @@ export default function LoginPage() {
             </form>
 
             <p className="mt-8 text-center text-xs leading-5 text-slate-400">
-              Protected access for authorized MS Home Security staff.
+              Protected access for authorized MS Security Systems staff.
             </p>
           </div>
         </div>

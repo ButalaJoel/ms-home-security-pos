@@ -13,9 +13,35 @@ export function settingText(settings: Settings, key: string, fallback = ""): str
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
-function company(settings: Settings) {
+/**
+ * Business details stored on a sale or quotation when it was made. Documents issued
+ * before a rename keep the name, logo and contacts they were issued with.
+ */
+export type BusinessSnapshot = Partial<{
+  name: string; phone: string; phone2: string; phone3: string; email: string;
+  address: string; logoUrl: string; tinNumber: string; warrantyDuration: string;
+}>;
+
+/** Line under the business name. Documents issued under the old name keep the old line. */
+export function businessTagline(name: string): string {
+  return /home security/i.test(name) ? "Security Solutions" : "Your Security, Our Priority.";
+}
+
+function company(settings: Settings, snapshot?: BusinessSnapshot | null) {
+  if (snapshot?.name) {
+    return {
+      name: snapshot.name,
+      phone: snapshot.phone ?? "",
+      phone2: snapshot.phone2 ?? "",
+      phone3: snapshot.phone3 ?? "",
+      email: snapshot.email ?? "",
+      address: snapshot.address ?? "",
+      logo: snapshot.logoUrl ?? "",
+      warranty: snapshot.warrantyDuration || settingText(settings, "warrantyDuration"),
+    };
+  }
   return {
-    name: settingText(settings, "businessName", "MS Home Security Solutions"),
+    name: settingText(settings, "businessName", "MS Security Systems Ltd"),
     phone: settingText(settings, "phone", settingText(settings, "businessPhone")),
     phone2: settingText(settings, "phone2", settingText(settings, "alternatePhone")),
     phone3: settingText(settings, "phone3", settingText(settings, "additionalPhone")),
@@ -50,6 +76,7 @@ function paymentInstructions(settings: Settings): string {
 
 export type QuotationForDocument = {
   number: string;
+  businessSnapshot?: BusinessSnapshot | null;
   createdAt?: string;
   validDays: number;
   validUntil?: string;
@@ -70,7 +97,7 @@ export type QuotationForDocument = {
 };
 
 export function quotationHtml(quote: QuotationForDocument, settings: Settings): string {
-  const c = company(settings);
+  const c = company(settings, quote.businessSnapshot);
   const rows = quote.items
     .map(
       (item) => `<tr>
@@ -148,7 +175,7 @@ export function quotationHtml(quote: QuotationForDocument, settings: Settings): 
 <body><main class="document">
   <header class="header">
     <div class="business">
-      <div class="brand">${logoHtml}<div><p class="business-name">${escapeHtml(c.name)}</p><div class="tagline">Security Solutions</div></div></div>
+      <div class="brand">${logoHtml}<div><p class="business-name">${escapeHtml(c.name)}</p><div class="tagline">${escapeHtml(businessTagline(c.name))}</div></div></div>
       <div class="contact"><p>${escapeHtml(c.address)}</p>${c.phone ? `<p>${escapeHtml(c.phone)}</p>` : ""}${c.phone2 ? `<p>${escapeHtml(c.phone2)}</p>` : ""}${c.phone3 ? `<p>${escapeHtml(c.phone3)}</p>` : ""}${c.email ? `<p>${escapeHtml(c.email)}</p>` : ""}</div>
     </div>
     <div class="quote-meta"><h1>QUOTATION</h1><p class="reference">${escapeHtml(quote.number)}</p>
@@ -175,6 +202,7 @@ export function quotationHtml(quote: QuotationForDocument, settings: Settings): 
 // ---------------------------------------------------------------- Invoice / receipt
 
 export type SaleForDocument = {
+  businessSnapshot?: BusinessSnapshot | null;
   _id?: string;
   id?: string;
   receiptNumber?: string;
@@ -238,7 +266,7 @@ export function invoiceNumber(sale: SaleForDocument, settings: Settings): string
 }
 
 export function saleDocumentHtml(sale: SaleForDocument, kind: "invoice" | "receipt", settings: Settings): string {
-  const c = company(settings);
+  const c = company(settings, sale.businessSnapshot);
   const isReceipt = kind === "receipt";
   const reference = saleReference(sale);
   const number = isReceipt ? reference : invoiceNumber(sale, settings);
@@ -294,7 +322,7 @@ tr{break-inside:avoid;page-break-inside:avoid}
 .footer{border-top:1px solid #e2e8f0;margin-top:30px;padding-top:12px;color:#64748b;font-size:10px}
 @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0}}
 </style></head><body>
-<header><div><div class="brand">${logo}<div><h2>${escapeHtml(c.name)}</h2><p class="muted">Security Solutions</p></div></div>
+<header><div><div class="brand">${logo}<div><h2>${escapeHtml(c.name)}</h2><p class="muted">${escapeHtml(businessTagline(c.name))}</p></div></div>
 <p>${escapeHtml(c.address)}</p><p>${escapeHtml(c.phone)}${c.phone2 ? " · " + escapeHtml(c.phone2) : ""}</p>
 ${c.phone3 ? `<p>${escapeHtml(c.phone3)}</p>` : ""}<p>${escapeHtml(c.email)}</p></div>
 <div class="right"><h1>${isReceipt ? "PAYMENT RECEIPT" : "SALES INVOICE"}</h1><p><b>${isReceipt ? "Receipt" : "Invoice"} No:</b> ${escapeHtml(number)}</p>

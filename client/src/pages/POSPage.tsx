@@ -1258,7 +1258,7 @@ const grandTotal = taxableAmount + tax;
           <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                MS Home Security
+                MS Security Systems Ltd
               </p>
               <h2 className="mt-1 text-2xl font-bold">Sales receipt</h2>
               <p className="mt-1 text-sm text-slate-500">
@@ -1434,7 +1434,7 @@ const grandTotal = taxableAmount + tax;
           </div>
 
           <p className="mt-8 border-t border-dashed border-slate-300 pt-4 text-center text-xs text-slate-500">
-            Thank you for shopping with MS Home Security.
+            Thank you for shopping with MS Security Systems.
           </p>
         </section>
       )}

@@ -1,6 +1,6 @@
 
 /**
- * MS Home Security POS — Express API
+ * MS Security Systems POS — Express API
  *
  * Responsibilities:
  * 1. Connect to MongoDB.
@@ -50,6 +50,7 @@ import productPhotoRoutes from "./features/productPhotos.js";
 import productImportRoutes from "./features/productImport.js";
 import publicRoutes from "./features/public.js";
 import websiteOrderRoutes from "./features/websiteOrders.js";
+import { runRenameMigration, snapshotFromSettings } from "./features/businessSnapshot.js";
 import productWebsiteRoutes, {
   hasWebsiteFields,
   parseWebsiteFields,
@@ -260,7 +261,7 @@ const adjustmentTypes: AdjustmentType[] = [
 // Every field the Settings page can save. Fields not listed here are ignored,
 // so this list must match the Settings page.
 const defaultSettings = {
-  businessName: "MS Home Security",
+  businessName: "MS Security Systems Ltd",
   businessEmail: "",
   businessPhone: "",
   businessAddress: "",
@@ -367,7 +368,7 @@ app.use("/api/auth", authRoutes);
 app.get("/api/health", (_req: Request, res: Response) => {
   res.json({
     success: true,
-    message: "MS Home Security POS API is running.",
+    message: "MS Security Systems POS API is running.",
   });
 });
 
@@ -2161,6 +2162,9 @@ const grandTotal = taxableAmount + tax;
   ...(clientSaleId ? { clientSaleId } : {}),
   receiptNumber,
 
+  // Business details as they are today, so a later rename never changes this receipt.
+  businessSnapshot: snapshotFromSettings(savedSettings),
+
   // Preserve the existing customer field for compatibility with other pages.
   customer,
 customerId: customerId ? String(customerId) : null,
@@ -2388,8 +2392,11 @@ async function startServer() {
     );
     if (moved.modifiedCount > 0) console.log(`Moved ${moved.modifiedCount} product(s) to Safety & Guard Equipment.`);
 
+    // One-time rename to MS Security Systems Ltd; old documents keep the old name.
+    await runRenameMigration(db).catch((error) => console.error("Rename update failed; will retry on next start", error));
+
     app.listen(port, () => {
-      console.log(`MS Home Security API running on http://localhost:${port}`);
+      console.log(`MS Security Systems API running on http://localhost:${port}`);
     });
   } catch (error) {
     console.error("Server startup failed:", error);

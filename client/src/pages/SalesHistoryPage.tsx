@@ -576,7 +576,7 @@ export default function SalesHistoryPage() {
         const doc = sendingDoc;
         const isInvoice = doc.kind === "invoice";
         const number = isInvoice ? invoiceNumber(doc.sale as SaleForDocument, settings) : doc.sale.receiptNumber;
-        const business = settingText(settings, "businessName", "MS Home Security Solutions");
+        const business = settingText(settings, "businessName", "MS Security Systems Ltd");
         return (
           <ShareDialog
             title={`${doc.kind} ${number}`}

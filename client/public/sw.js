@@ -1,14 +1,14 @@
 /*
- * Service worker for MS Home Security POS.
+ * Service worker for MS Security Systems POS.
  * - Makes the app installable ("Add to Home Screen").
  * - Opens fast: the app shell and hashed assets are cached.
  * - Never caches /api requests: sales, stock and money always come live
  *   from the server.
  * Bump VERSION to force every phone to drop old cached files.
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const CACHE = `ms-pos-${VERSION}`;
-const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/ms-home-security-logo.png"];
+const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/ms-security-systems-logo.png"];
 
 // Save the app shell AND the build files it references (the hashed
 // /assets/*.js and *.css), so the till opens with no internet even on a

@@ -1,6 +1,6 @@
 /**
 
- * MS Home Security Solutions — Invoices & Receipts
+ * MS Security Systems Ltd — Invoices & Receipts
 
  *
 
@@ -53,7 +53,7 @@ import { API_BASE, apiFetch } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 import { Send } from "lucide-react";
 import ShareDialog from "../components/ShareDialog";
-import { invoiceNumber, saleDocumentHtml, type SaleForDocument } from "../lib/documents";
+import { businessTagline, invoiceNumber, saleDocumentHtml, type SaleForDocument } from "../lib/documents";
 import { amountInWords } from "../lib/format";
 
 
@@ -244,7 +244,7 @@ export default function DocumentsPage() {
 
     useState<Record<string, unknown>>({
 
-      businessName: "MS Home Security Solutions",
+      businessName: "MS Security Systems Ltd",
 
       phone: "+256 759 985 611",
 
@@ -588,7 +588,7 @@ table{width:100%;border-collapse:collapse;margin-top:18px}th{background:#172033;
 .notice{margin-top:18px;padding:12px;background:#f8fafc;border-left:3px solid #0ea5e9}.footer{border-top:1px solid #e2e8f0;margin-top:30px;padding-top:12px;color:#64748b;font-size:10px}
 @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head><body>
-<header><div><div class="brand">${logo}<div><h2>${escapeHtml(companyName)}</h2><p class="muted">Security Solutions</p></div></div>
+<header><div><div class="brand">${logo}<div><h2>${escapeHtml(companyName)}</h2><p class="muted">${escapeHtml(businessTagline(companyName))}</p></div></div>
 <p>${escapeHtml(companyAddress)}</p><p>${escapeHtml(companyPhone)} ${companyPhone2 ? " · " + escapeHtml(companyPhone2) : ""}</p>
 ${companyPhone3 ? `<p>${escapeHtml(companyPhone3)}</p>` : ""}<p>${escapeHtml(companyEmail)}</p></div>
 <div class="right"><h1>${isReceipt ? "PAYMENT RECEIPT" : "SALES INVOICE"}</h1><p><b>${isReceipt ? "Receipt" : "Invoice"} No:</b> ${escapeHtml(number)}</p>
@@ -661,7 +661,7 @@ ${isReceipt ? (paid > 0 ? " This receipt records the payment shown above against
 
     "businessName",
 
-    "MS Home Security Solutions",
+    "MS Security Systems Ltd",
 
   );
 
@@ -1228,7 +1228,7 @@ const configuredTaxRate = (() => {
 <main class="document">
   <header class="header">
     <div class="business">
-      <div class="brand">${logoHtml}<div><p class="business-name">${escapeHtml(companyName)}</p><div class="tagline">Security Solutions</div></div></div>
+      <div class="brand">${logoHtml}<div><p class="business-name">${escapeHtml(companyName)}</p><div class="tagline">${escapeHtml(businessTagline(companyName))}</div></div></div>
       <div class="contact"><p>${escapeHtml(companyAddress)}</p>${companyPhone ? `<p>${escapeHtml(companyPhone)}</p>` : ""}${companyPhone2 ? `<p>${escapeHtml(companyPhone2)}</p>` : ""}${companyPhone3 ? `<p>${escapeHtml(companyPhone3)}</p>` : ""}${companyEmail ? `<p>${escapeHtml(companyEmail)}</p>` : ""}</div>
     </div>
     <div class="quote-meta"><h1>QUOTATION</h1><p class="reference">${escapeHtml(quoteNumber)}</p><p>Date: ${escapeHtml(new Date().toLocaleDateString("en-GB"))}</p><p>Valid for: ${escapeHtml(validDays)} days</p></div>
@@ -2364,7 +2364,7 @@ const configuredTaxRate = (() => {
             </div>
             <div className="p-5 sm:p-7">
               <div className="flex flex-col justify-between gap-4 border-b-2 border-sky-500 pb-5 sm:flex-row">
-                <div><div className="flex items-center gap-3">{companyLogo ? <img src={companyLogo} alt={`${companyName} logo`} className="h-14 w-14 object-contain" /> : <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-500 font-extrabold text-white">MS</div>}<div><h4 className="font-bold text-slate-900">{companyName}</h4><p className="text-xs uppercase tracking-widest text-sky-600">Security Solutions</p></div></div>
+                <div><div className="flex items-center gap-3">{companyLogo ? <img src={companyLogo} alt={`${companyName} logo`} className="h-14 w-14 object-contain" /> : <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-500 font-extrabold text-white">MS</div>}<div><h4 className="font-bold text-slate-900">{companyName}</h4><p className="text-xs uppercase tracking-widest text-sky-600">{businessTagline(companyName)}</p></div></div>
                   <p className="mt-3 text-sm text-slate-500">{companyAddress}</p><p className="text-sm text-slate-500">{companyPhone}{companyPhone2 ? ` · ${companyPhone2}` : ""}</p>{companyPhone3 && <p className="text-sm text-slate-500">{companyPhone3}</p>}<p className="text-sm text-slate-500">{companyEmail}</p></div>
                 <div className="sm:text-right"><h2 className="text-2xl font-extrabold">{selectedDocument.kind === "invoice" ? "INVOICE" : "RECEIPT"}</h2><p className="mt-1 text-sm font-bold text-sky-700">{selectedDocument.kind === "invoice" ? `INV-${saleReference(selectedDocument.sale).replace(/^MS-/, "")}` : saleReference(selectedDocument.sale)}</p><p className="text-sm text-slate-500">{selectedDocument.sale.createdAt ? new Date(selectedDocument.sale.createdAt).toLocaleString("en-GB") : "Date unavailable"}</p><p className="mt-2 text-sm">Payment status: <strong>{salePaymentStatus(selectedDocument.sale)}</strong></p></div>
               </div>
@@ -2503,7 +2503,7 @@ const configuredTaxRate = (() => {
 
                       <p className="text-xs uppercase tracking-[0.2em] text-sky-600">
 
-                        Security Solutions
+                        {businessTagline(companyName)}
 
                       </p>
 
@@ -2976,7 +2976,7 @@ const configuredTaxRate = (() => {
         const sale = doc.sale as SaleForDocument;
         const isInvoice = doc.kind === "invoice";
         const number = isInvoice ? invoiceNumber(sale, businessSettings) : saleReference(doc.sale);
-        const business = settingText("businessName", "MS Home Security Solutions");
+        const business = settingText("businessName", "MS Security Systems Ltd");
         return (
           <ShareDialog
             title={`${doc.kind} ${number}`}

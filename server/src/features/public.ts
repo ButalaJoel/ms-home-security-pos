@@ -1,5 +1,5 @@
 /**
- * Public endpoints for the MS Home Security website (no login).
+ * Public endpoints for the MS Security Systems website (no login).
  *
  * They return ONLY what the website shows. Never cost price, exact stock
  * counts, reorder levels, photo storage ids, users, customers or sales.
@@ -107,7 +107,7 @@ router.get("/api/public/business", readLimiter, async (_req: Request, res: Respo
     res.json({
       success: true,
       business: {
-        name: text(s.businessName).trim() || "MS Home Security Solutions",
+        name: text(s.businessName).trim() || "MS Security Systems Ltd",
         phones: uniquePhones,
         whatsapp: (text(s.whatsappNumber).trim() || uniquePhones[0] || "").replace(/[^\d+]/g, ""),
         email: text(s.email).trim() || text(s.businessEmail).trim(),

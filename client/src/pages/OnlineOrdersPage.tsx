@@ -193,7 +193,7 @@ export default function OnlineOrdersPage() {
                     <div className="flex flex-wrap gap-2 pt-1">
                       <a href={`tel:+${order.customer.phone}`} className={secondaryButton}><Phone size={15} /> Call</a>
                       <a
-                        href={whatsappUrl(order.customer.phone, `Hello ${firstName}, this is MS Home Security about your website order ${order.number}. `)}
+                        href={whatsappUrl(order.customer.phone, `Hello ${firstName}, this is MS Security Systems about your website order ${order.number}. `)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className={secondaryButton}

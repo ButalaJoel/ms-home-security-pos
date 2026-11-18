@@ -149,7 +149,7 @@ export default function JobsPage() {
   }
 
   function printJobCard(job: Form, number: string) {
-    const business = settingText(settings, "businessName", "MS Home Security Solutions");
+    const business = settingText(settings, "businessName", "MS Security Systems Ltd");
     const row = (label: string, value: string) => (value ? `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value).replace(/\n/g, "<br>")}</td></tr>` : "");
     printHtml(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(number)}</title><style>
       @page{size:A4;margin:14mm}body{font:12px/1.5 Arial,sans-serif;color:#172033}h1{margin:0;font-size:22px}

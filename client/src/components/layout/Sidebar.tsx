@@ -122,8 +122,8 @@ export default function Sidebar({
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-b-xl rounded-t-sm bg-sky-500 text-sm font-extrabold text-white">
               <img
-  src="/ms-home-security-logo.png"
-  alt="MS Home Security Solutions"
+  src="/ms-security-systems-logo.png"
+  alt="MS Security Systems Ltd"
   className={`
     rounded-lg bg-white object-contain p-1
     ${collapsed ? "h-10 w-12" : "h-12 w-[176px]"}
@@ -134,11 +134,11 @@ export default function Sidebar({
             {!collapsed && (
               <div className="text-left">
                 <p className="whitespace-nowrap text-[11px] font-extrabold tracking-wide text-white">
-                  MS HOME SECURITY
+                  MS SECURITY
                 </p>
 
                 <p className="mt-1 text-[9px] tracking-[0.35em] text-sky-400">
-                  SOLUTIONS
+                  SYSTEMS LTD
                 </p>
               </div>
             )}

@@ -39,7 +39,7 @@ type SettingSection =
   | "sync";
 
 const initialSettings = {
-  businessName: "MS Home Security Solutions",
+  businessName: "MS Security Systems Ltd",
   phone: "+256 759 985 611",
   phone2: "+256 792 977 212",
   phone3: "+256 740 853 303",
@@ -418,10 +418,10 @@ const loaded: BusinessSettings = {
 
                 <div>
                   <p className="text-sm font-bold text-[#10213b]">
-                    {settings.businessName || "MS HOME SECURITY"}
+                    {settings.businessName || "MS SECURITY SYSTEMS"}
                   </p>
-                  <p className="text-[10px] font-semibold tracking-[0.25em] text-[#08a9df]">
-                    SOLUTIONS
+                  <p className="text-[10px] font-semibold tracking-wide text-[#08a9df]">
+                    Your Security, Our Priority.
                   </p>
                 </div>
               </div>

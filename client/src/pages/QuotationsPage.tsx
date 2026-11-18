@@ -372,7 +372,7 @@ export default function QuotationsPage() {
   );
 
   const shareMessage = current
-    ? `Hello ${current.customerName},\n\nPlease find attached quotation ${current.number} from ${settingText(settings, "businessName", "MS Home Security Solutions")} for ${formatUGX(current.grandTotal)}, valid until ${formatDate(current.validUntil)}.\n\nThank you.`
+    ? `Hello ${current.customerName},\n\nPlease find attached quotation ${current.number} from ${settingText(settings, "businessName", "MS Security Systems Ltd")} for ${formatUGX(current.grandTotal)}, valid until ${formatDate(current.validUntil)}.\n\nThank you.`
     : "";
 
   // ---------------- Render ----------------
@@ -641,7 +641,7 @@ export default function QuotationsPage() {
             html={currentHtml}
             fileName={`${current.number}.pdf`}
             message={shareMessage}
-            emailSubject={`Quotation ${current.number} — ${settingText(settings, "businessName", "MS Home Security Solutions")}`}
+            emailSubject={`Quotation ${current.number} — ${settingText(settings, "businessName", "MS Security Systems Ltd")}`}
             phone={current.customerPhone}
             email={current.customerEmail}
             onClose={() => setSharing(false)}

@@ -44,7 +44,7 @@ export default function BalancesPage() {
   }, [load]);
 
   function reminder(entry: OwingCustomer): string {
-    const business = settingText(settings, "businessName", "MS Home Security Solutions");
+    const business = settingText(settings, "businessName", "MS Security Systems Ltd");
     const lines = entry.sales.map((sale) => `• ${sale.receiptNumber} (${formatDate(sale.createdAt)}): ${formatUGX(sale.balance)}`).join("\n");
     return `Hello ${entry.customer},\n\nThis is a friendly reminder from ${business}. Your outstanding balance is ${formatUGX(entry.balance)}:\n${lines}\n\nThank you.`;
   }

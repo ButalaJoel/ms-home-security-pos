@@ -12,6 +12,7 @@
 import { Router, type Request, type Response } from "express";
 import type { Db, Document } from "mongodb";
 import { connectToDatabase } from "../db.js";
+import { currentBusinessSnapshot } from "./businessSnapshot.js";
 import { requireAuth } from "../authMiddleware.js";
 import {
   cleanText,
@@ -214,6 +215,8 @@ router.post("/", async (req: Request, res: Response) => {
       number,
       status,
       ...parsed,
+      // Business details as they are today, so a later rename never changes this quotation.
+      businessSnapshot: await currentBusinessSnapshot(db),
       validUntil: validUntil(now, parsed.validDays),
       saleId: null as string | null,
       saleReference: "",
@@ -310,6 +313,7 @@ router.post("/:id/duplicate", async (req: Request, res: Response) => {
       saleId: null,
       saleReference: "",
       duplicatedFrom: source.number,
+      businessSnapshot: await currentBusinessSnapshot(db), // a new document carries today's details
       createdById: user.id,
       createdByName: user.name,
       updatedByName: user.name,

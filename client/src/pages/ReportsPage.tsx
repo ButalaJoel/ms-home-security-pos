@@ -387,7 +387,7 @@ export default function ReportsPage() {
   // Export the currently filtered summary and detailed report as spreadsheet-friendly CSV.
   function exportCSV() {
     const rows: unknown[][] = [
-      ["MS Home Security POS report"],
+      ["MS Security Systems POS report"],
       ["Period start", startDate, "Period end", endDate],
       [],
       ["Metric", "Value", "Notes"],

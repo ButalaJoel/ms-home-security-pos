@@ -35,7 +35,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const location = useLocation();
   const { user } = useAuth();
 
-  const title = pageTitles[location.pathname] ?? "MS Home Security";
+  const title = pageTitles[location.pathname] ?? "MS Security Systems";
   const isDashboard = location.pathname === "/";
   const userName = user?.name || "Signed-in user";
   const userRole = user?.role === "admin" ? "Administrator" : "Staff";
@@ -58,7 +58,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
           </h1>
 
           <p className="mt-1 hidden text-xs text-slate-400 sm:block">
-            MS Home Security
+            MS Security Systems
             <span className="mx-2">/</span>
             {title}
           </p>
